@@ -18,21 +18,26 @@ from pymatgen.phasediagram.pdmaker import PhaseDiagram
 from pymatgen.phasediagram.pdanalyzer import PDAnalyzer
 
 
-def compute_relative_energies(list_x_alkali,list_energies_per_unit):
+def compute_relative_energies(list_x_alkali,list_energies_per_unit,E0_E1=None):
 
     tol = 1e-8
 
     x_max = N.max(list_x_alkali)
 
-    I0 = N.where( N.abs(list_x_alkali) < tol )
-    E0 = N.min(list_energies_per_unit[I0])
+    list_x = list_x_alkali/x_max
 
-    I1 = N.where( N.abs(list_x_alkali-x_max) < tol )[0]
-    E1 = N.min(list_energies_per_unit[I1])
+    if E0_E1 == None:
+        I0 = N.where( N.abs(list_x_alkali) < tol )
+        E0 = N.min(list_energies_per_unit[I0])
 
-    list_relative_E = list_energies_per_unit-list_x_alkali/x_max*E1-(1.-list_x_alkali/x_max)*E0
+        I1 = N.where( N.abs(list_x_alkali-x_max) < tol )[0]
+        E1 = N.min(list_energies_per_unit[I1])
+    else:
+        E0, E1 = E0_E1
 
-    return list_relative_E 
+    list_relative_E = list_energies_per_unit-list_x*E1-(1.-list_x)*E0
+
+    return list_x, list_relative_E, E0, E1
 
 def compute_voltage(list_x_alkali,list_energies_per_unit,E_alkali):
     """
