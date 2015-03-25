@@ -42,7 +42,7 @@ def compute_voltage(list_x_alkali,list_energies_per_unit,E_alkali):
     #  Build the lowest energy curve
     list_xV = []
     list_EV = []
-    for x in N.argsort(list(set(list_x_alkali))):
+    for x in N.sort(list(set(list_x_alkali))):
         I = N.where(list_x_alkali== x)[0]
 
         list_EV.append(N.min(list_energies_per_unit[I]))
@@ -111,6 +111,17 @@ class AnalyseJsonData():
         return list_compositions
 
 
+    def extract_energies(self):
+
+        list_energies = []
+        for data_dictionary in self.list_data_dictionaries:
+            energy = data_dictionary['relaxation'][-1]['electronic']['e_0_energy']
+            list_energies.append(energy)
+
+        return N.array(list_energies)
+
+
+
     def extract_magnetization(self,Element):
         MAG = []
 
@@ -156,10 +167,17 @@ class AnalyseMaterialsProjectJsonData():
 
         return
 
-    def extract_energies(self,MP_json_data_filename,alkali):
+    def extract_processed_entries(self,MP_json_data_filename):
 
         computed_entries  = self._extract_MP_data(MP_json_data_filename)
         processed_entries = self.compat.process_entries(computed_entries)
+
+        return processed_entries
+
+
+    def extract_energies(self,MP_json_data_filename,alkali):
+
+        processed_entries = self.extract_processed_entries(MP_json_data_filename)
 
         list_energy         = []
         list_alkali_content = []
@@ -173,7 +191,6 @@ class AnalyseMaterialsProjectJsonData():
         I = N.argsort(list_alkali_content )
         
         return list_alkali_content[I], list_energy[I]
-
 
     def _extract_MP_data(self,MP_data_filename):
 
