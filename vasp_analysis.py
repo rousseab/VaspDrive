@@ -5,17 +5,48 @@
 import numpy as N 
 import os
 import sys
-
-import pymatgen
-from pymatgen.serializers.json_coders import pmg_load
-
 import json
 
+import pymatgen
+
+from pymatgen.serializers.json_coders import pmg_load
+from pymatgen.apps.borg.hive import VaspToComputedEntryDrone
+from pymatgen.apps.borg.queen import BorgQueen
+from pymatgen.entries.compatibility import MaterialsProjectCompatibility
+
+from pymatgen.phasediagram.pdmaker import PhaseDiagram
+from pymatgen.phasediagram.pdanalyzer import PDAnalyzer
+
+
+def compute_relative_energies(list_x_alkali,list_energies_per_unit):
+
+    tol = 1e-8
+
+    x_max = N.max(list_x_alkali)
+
+    I0 = N.where( N.abs(list_x_alkali) < tol )
+    E0 = N.min(list_energies_per_unit[I0])
+
+    I1 = N.where( N.abs(list_x_alkali-x_max) < tol )[0]
+    E1 = N.min(list_energies_per_unit[I1])
+
+    list_relative_E = list_energies_per_unit-list_x/x_max*E1-(1.-list_x/x_max)*E0
+
+    return list_relative_E 
+
+
+def compute_voltage(list_x_alkali,list_energies_per_unit,E_alkali):
+    """
+    This function computes voltage plateaus for compound 
+    """
+    return        
 
 
 class AnalyseJsonData():
     """
     Class which will easily extract data from "run_data.json" files.
+    The expected json files are in my own format, wrapping up most  of
+    the relevant information in a VASP vasprun.xml and OUTCAR files. 
     """
 
     def __init__(self,list_json_data_filenames):
@@ -56,11 +87,8 @@ class AnalyseJsonData():
     def extract_magnetization(self,Element):
         MAG = []
 
-
         for data_dictionary, structure in zip(self.list_data_dictionaries,self.list_structures):
-
             list_d = data_dictionary['OUTCAR']['magnetization']                                                              
-
             list_mag = []
 
             for site, d in zip(structure,list_d):
@@ -71,3 +99,64 @@ class AnalyseJsonData():
 
         return MAG
 
+class AnalyseMaterialsProjectJsonData():
+    """
+    Class which will wrap around boilerplate analysis of MaterialsProject-like
+    json files, containing data extracted using borgs and queens.
+
+    """
+
+    def __init__(self):
+        # some MP analysis power tools
+        self.compat  = MaterialsProjectCompatibility()
+
+        return
+
+    def extract_alkali_energy(self, MP_alkali_json_data_filename):
+        computed_entry = self._extract_MP_data(MP_alkali_json_data_filename)[0]
+        processed_Alkali_entry = self.compat.process_entry(computed_entry)
+        self.E_Alkali = processed_Alkali_entry.energy
+
+        return
+
+    def extract_phase_diagram_info(self,MP_phase_diagram_json_data_filename):
+
+        computed_entries  = self._extract_MP_data(MP_phase_diagram_json_data_filename)
+        processed_entries = self.compat.process_entries(computed_entries)
+
+        pd = PhaseDiagram(processed_entries)
+        self.phase_diagram_analyser = PDAnalyzer(pd)
+
+        return
+
+    def extract_energies(self,MP_json_data_filename,alkali):
+
+        computed_entries  = self._extract_MP_data(MP_json_data_filename)
+        processed_entries = self.compat.process_entries(computed_entries)
+
+        list_energy         = []
+        list_alkali_content = []
+        for entry in processed_entries:
+            list_energy.append(entry.energy)
+            list_alkali_content.append(entry.composition[alkali])
+
+        list_energy         = N.array(list_energy)
+        list_alkali_content = N.array(list_alkali_content )
+
+        I = N.argsort(list_alkali_content )
+        
+        return list_alkali_content[I], list_energy[I]
+
+
+    def _extract_MP_data(self,MP_data_filename):
+
+        drone = VaspToComputedEntryDrone()
+        queen = BorgQueen(drone, "dummy", 1)
+
+        queen.load_data(MP_data_filename)
+        computed_entries = queen.get_data()
+
+        del drone
+        del queen
+
+        return computed_entries 
