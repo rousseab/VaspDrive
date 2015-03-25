@@ -30,7 +30,7 @@ def compute_relative_energies(list_x_alkali,list_energies_per_unit):
     I1 = N.where( N.abs(list_x_alkali-x_max) < tol )[0]
     E1 = N.min(list_energies_per_unit[I1])
 
-    list_relative_E = list_energies_per_unit-list_x/x_max*E1-(1.-list_x/x_max)*E0
+    list_relative_E = list_energies_per_unit-list_x_alkali/x_max*E1-(1.-list_x_alkali/x_max)*E0
 
     return list_relative_E 
 
@@ -173,7 +173,6 @@ class AnalyseMaterialsProjectJsonData():
         processed_entries = self.compat.process_entries(computed_entries)
 
         return processed_entries
-
 
     def extract_energies(self,MP_json_data_filename,alkali):
 
