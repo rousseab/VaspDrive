@@ -34,12 +34,39 @@ def compute_relative_energies(list_x_alkali,list_energies_per_unit):
 
     return list_relative_E 
 
-
 def compute_voltage(list_x_alkali,list_energies_per_unit,E_alkali):
     """
     This function computes voltage plateaus for compound 
     """
-    return        
+
+    #  Build the lowest energy curve
+    list_xV = []
+    list_EV = []
+    for x in N.argsort(list(set(list_x_alkali))):
+        I = N.where(list_x_alkali== x)[0]
+
+        list_EV.append(N.min(list_energies_per_unit[I]))
+        list_xV.append(x)
+
+    list_EV = N.array(list_EV)
+    list_xV = N.array(list_xV)
+
+    list_V = E_alkali - (list_EV[1:]-list_EV[:-1])/(list_xV[1:]-list_xV[:-1])
+
+    list_x_plateau = []
+    list_V_plateau = []
+
+    for i,V in enumerate(list_V):
+        x0 = list_xV[i]
+        x1 = list_xV[i+1]
+
+        list_x_plateau.append(x0)
+        list_x_plateau.append(x1)
+
+        list_V_plateau.append(V)
+        list_V_plateau.append(V)
+
+    return N.array(list_x_plateau), N.array(list_V_plateau)
 
 
 class AnalyseJsonData():
