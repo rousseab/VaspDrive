@@ -37,7 +37,20 @@ def compute_relative_energies(list_x_alkali,list_energies_per_unit,E0_E1=None):
 
     list_relative_E = list_energies_per_unit-list_x*E1-(1.-list_x)*E0
 
-    return list_x, list_relative_E, E0, E1
+
+    list_x_min = []
+    list_E_min = []
+
+    tol = 1e-8
+    for x in N.sort(list(set(list_x))):
+        list_x_min.append(x)
+        I = N.where( N.sqrt((list_x - x)**2) < tol)[0]
+        list_E_min.append( N.min(list_relative_E[I]) )
+
+    list_x_min = N.array(list_x_min )
+    list_E_min = N.array(list_E_min )
+
+    return list_x, list_relative_E, list_x_min, list_E_min, E0, E1
 
 def compute_voltage(list_x_alkali,list_energies_per_unit,E_alkali):
     """
@@ -178,6 +191,28 @@ class AnalyseMaterialsProjectJsonData():
         processed_entries = self.compat.process_entries(computed_entries)
 
         return processed_entries
+
+
+    def extract_energies_above_hull(self,MP_json_data_filename,alkali):
+
+        processed_entries = self.extract_processed_entries(MP_json_data_filename)
+
+        list_energy_above_hull  = []
+        list_alkali_content = []
+
+        for entry in processed_entries: 
+            decomposition_dict, energy_above_hull  = \
+                self.phase_diagram_analyser.get_decomp_and_e_above_hull(entry, allow_negative=True)
+
+            list_energy_above_hull.append(energy_above_hull)  
+            list_alkali_content.append(entry.composition[alkali])
+
+        list_energy_above_hull  = N.array(list_energy_above_hull)
+        list_alkali_content     = N.array(list_alkali_content )
+
+        return list_alkali_content, list_energy_above_hull  
+
+
 
     def extract_energies(self,MP_json_data_filename,alkali):
 
