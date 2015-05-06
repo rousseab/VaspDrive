@@ -2,7 +2,7 @@
 # Suite of functions to analyse my VASP generated data
 #================================================================================
 
-import numpy as N 
+import numpy as np
 import os
 import sys
 import json
@@ -22,16 +22,16 @@ def compute_relative_energies(list_x_alkali,list_energies_per_unit,E0_E1=None):
 
     tol = 1e-8
 
-    x_max = N.max(list_x_alkali)
+    x_max = np.max(list_x_alkali)
 
     list_x = list_x_alkali/x_max
 
     if E0_E1 == None:
-        I0 = N.where( N.abs(list_x_alkali) < tol )
-        E0 = N.min(list_energies_per_unit[I0])
+        I0 = np.where( np.abs(list_x_alkali) < tol )
+        E0 = np.min(list_energies_per_unit[I0])
 
-        I1 = N.where( N.abs(list_x_alkali-x_max) < tol )[0]
-        E1 = N.min(list_energies_per_unit[I1])
+        I1 = np.where( np.abs(list_x_alkali-x_max) < tol )[0]
+        E1 = np.min(list_energies_per_unit[I1])
     else:
         E0, E1 = E0_E1
 
@@ -42,13 +42,13 @@ def compute_relative_energies(list_x_alkali,list_energies_per_unit,E0_E1=None):
     list_E_min = []
 
     tol = 1e-8
-    for x in N.sort(list(set(list_x))):
+    for x in np.sort(list(set(list_x))):
         list_x_min.append(x)
-        I = N.where( N.sqrt((list_x - x)**2) < tol)[0]
-        list_E_min.append( N.min(list_relative_E[I]) )
+        I = np.where( np.sqrt((list_x - x)**2) < tol)[0]
+        list_E_min.append( np.min(list_relative_E[I]) )
 
-    list_x_min = N.array(list_x_min )
-    list_E_min = N.array(list_E_min )
+    list_x_min = np.array(list_x_min )
+    list_E_min = np.array(list_E_min )
 
     return list_x, list_relative_E, list_x_min, list_E_min, E0, E1
 
@@ -60,14 +60,14 @@ def compute_voltage(list_x_alkali,list_energies_per_unit,E_alkali):
     #  Build the lowest energy curve
     list_xV = []
     list_EV = []
-    for x in N.sort(list(set(list_x_alkali))):
-        I = N.where(list_x_alkali== x)[0]
+    for x in np.sort(list(set(list_x_alkali))):
+        I = np.where(list_x_alkali== x)[0]
 
-        list_EV.append(N.min(list_energies_per_unit[I]))
+        list_EV.append(np.min(list_energies_per_unit[I]))
         list_xV.append(x)
 
-    list_EV = N.array(list_EV)
-    list_xV = N.array(list_xV)
+    list_EV = np.array(list_EV)
+    list_xV = np.array(list_xV)
 
     list_V = E_alkali - (list_EV[1:]-list_EV[:-1])/(list_xV[1:]-list_xV[:-1])
 
@@ -84,7 +84,7 @@ def compute_voltage(list_x_alkali,list_energies_per_unit,E_alkali):
         list_V_plateau.append(V)
         list_V_plateau.append(V)
 
-    return N.array(list_x_plateau), N.array(list_V_plateau)
+    return np.array(list_x_plateau), np.array(list_V_plateau)
 
 
 class AnalyseJsonData():
@@ -109,13 +109,17 @@ class AnalyseJsonData():
 
         for json_data_filename in self.list_json_data_filenames:
             with open(json_data_filename ,'r') as f:
-                data_dictionary = json.load(f)
-                self.list_data_dictionaries.append(data_dictionary) 
 
-                structure_dict = data_dictionary['relaxation'][-1]['structure']
-                structure = pymatgen.Structure.from_dict(structure_dict)
+                try:
+                    data_dictionary = json.load(f)
+                    self.list_data_dictionaries.append(data_dictionary) 
 
-                self.list_structures.append(structure)
+                    structure_dict = data_dictionary['relaxation'][-1]['structure']
+                    structure = pymatgen.Structure.from_dict(structure_dict)
+
+                    self.list_structures.append(structure)
+                except:
+                    print( 'file %s is broken'%json_data_filename)
 
         return
 
@@ -136,7 +140,7 @@ class AnalyseJsonData():
             energy = data_dictionary['relaxation'][-1]['electronic']['e_0_energy']
             list_energies.append(energy)
 
-        return N.array(list_energies)
+        return np.array(list_energies)
 
 
 
@@ -207,8 +211,8 @@ class AnalyseMaterialsProjectJsonData():
             list_energy_above_hull.append(energy_above_hull)  
             list_alkali_content.append(entry.composition[alkali])
 
-        list_energy_above_hull  = N.array(list_energy_above_hull)
-        list_alkali_content     = N.array(list_alkali_content )
+        list_energy_above_hull  = np.array(list_energy_above_hull)
+        list_alkali_content     = np.array(list_alkali_content )
 
         return list_alkali_content, list_energy_above_hull  
 
@@ -224,10 +228,10 @@ class AnalyseMaterialsProjectJsonData():
             list_energy.append(entry.energy)
             list_alkali_content.append(entry.composition[alkali])
 
-        list_energy         = N.array(list_energy)
-        list_alkali_content = N.array(list_alkali_content )
+        list_energy         = np.array(list_energy)
+        list_alkali_content = np.array(list_alkali_content )
 
-        I = N.argsort(list_alkali_content )
+        I = np.argsort(list_alkali_content )
         
         return list_alkali_content[I], list_energy[I]
 
