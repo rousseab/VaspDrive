@@ -1,6 +1,6 @@
-#================================================================================
-# Suite of functions to analyse my VASP generated data
-#================================================================================
+"""
+ Suite of functions to analyse my VASP generated data.
+"""
 
 import numpy as np
 import os
