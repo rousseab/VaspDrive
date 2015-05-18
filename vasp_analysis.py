@@ -86,7 +86,6 @@ def compute_voltage(list_x_alkali,list_energies_per_unit,E_alkali):
 
     return np.array(list_x_plateau), np.array(list_V_plateau)
 
-
 class AnalyseJsonData():
     """
     Class which will easily extract data from "run_data.json" files.
@@ -143,7 +142,6 @@ class AnalyseJsonData():
         return np.array(list_energies)
 
 
-
     def extract_magnetization(self,Element):
         MAG = []
 
@@ -196,7 +194,6 @@ class AnalyseMaterialsProjectJsonData():
 
         return processed_entries
 
-
     def extract_energies_above_hull(self,MP_json_data_filename,alkali):
 
         processed_entries = self.extract_processed_entries(MP_json_data_filename)
@@ -245,5 +242,23 @@ class AnalyseMaterialsProjectJsonData():
 
         del drone
         del queen
+
+        return computed_entries 
+
+class AnalyseMaterialsProjectJsonData_NoProcess(AnalyseMaterialsProjectJsonData):
+    """
+    The Materials Project processing facilities will normalize energies as long as
+    certain criteria are met. If not, no data is returned, breaking my voltage
+    computation code for slightly forced calculations (putting a U on Fe in a non-oxide
+    environment, for example). 
+    
+    This class will simply avoid the problem by not asking MP to renormalize the energies.
+    """
+
+    def extract_processed_entries(self,MP_json_data_filename):
+
+        computed_entries  = self._extract_MP_data(MP_json_data_filename)
+        # don't process!
+        #processed_entries = self.compat.process_entries(computed_entries)
 
         return computed_entries 
