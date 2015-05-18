@@ -1,8 +1,6 @@
-#================================================================================
  
     Collection of tools for analysis of VASP results
-
-#================================================================================
+================================================================================
 
 
 I find myself constantly solving ad hoc the same problems over and over again, wasting
