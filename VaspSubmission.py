@@ -58,7 +58,6 @@ rm -rf CHG DOSCAR IBZKPT OSZICAR output.txt res_out.txt vasprun.xml XDATCAR CHGC
 # helper routines
 #===========================================
 
-
 def get_POTCAR(poscar):
     list_postfix = ['_pv','_sv','']
 
