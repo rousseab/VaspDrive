@@ -57,14 +57,13 @@ def extract_DOS_data_with_ASE():
 
         found_doscar = True
     except:
-        print 'DOSCAR file missing or not readable'
+        print('DOSCAR file missing or not readable')
         found_doscar = False
 
     if found_doscar:
         pmg_dump(data_dict, 'ASE_DOS_data.json')
 
     return
-
 
 def extract_json_data():
     """
@@ -77,14 +76,14 @@ def extract_json_data():
         o  = Outcar('OUTCAR')
         found_outcar = True
     except:
-        print 'OUTCAR file missing or not readable'
+        print('OUTCAR file missing or not readable')
         found_outcar = False
 
     try:
         vr = Vasprun('vasprun.xml')
         found_vasprun = True
     except:
-        print 'vasprun.xml file missing or not readable'
+        print('vasprun.xml file missing or not readable')
         found_vasprun = False
 
 
@@ -99,7 +98,7 @@ def extract_json_data():
             dictionary_data['DOS'] = vr.complete_dos.as_dict()
             pymatgen_dos_success = True
         except:
-            print 'DOS COULD NOT BE EXTRACTED BY PYMATGEN...'
+            print('DOS COULD NOT BE EXTRACTED BY PYMATGEN...')
             pymatgen_dos_success = False
 
 
@@ -118,7 +117,6 @@ def extract_json_data():
         pmg_dump(dictionary_data, 'run_data.json')
 
     return    
-
 
 def get_qstat_ids():
     os.system('qstat > qstat.log')
