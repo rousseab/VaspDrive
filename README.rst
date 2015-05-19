@@ -8,7 +8,7 @@ There already exists many excellent tools to interact with VASP from python
 (FireWorks, Pymatgen, ASE); these tools must still be properly integrated into tailored 
 solutions for my needs.
 
-Here I want to "develop" and curate a suite of tools that I can use to perform 
+Here I want to develop and curate a suite of tools that I can use to perform 
     - task submission
     - data extraction
     - analysis
