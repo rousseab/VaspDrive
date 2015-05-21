@@ -55,7 +55,8 @@ rm -rf CHG DOSCAR IBZKPT OSZICAR output.txt res_out.txt vasprun.xml XDATCAR CHGC
 """
 
 #===========================================
-# helper routines
+# Hacking output of pymatgen, because
+# I'm using VASP 4.6 and not VASP 5.x
 #===========================================
 
 def get_POTCAR(poscar):
@@ -135,6 +136,10 @@ def hack_potcar_file(workdir,list_potcar_singles):
 
 
     return
+
+#===========================================
+# helper routines
+#===========================================
 
 def get_VASP_inputs(structure, workdir, job_name, nproc=64, kppa=500, extra_incar_dict = None):
 
