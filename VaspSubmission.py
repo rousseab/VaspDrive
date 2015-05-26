@@ -292,7 +292,7 @@ def get_MaterialsProject_VASP_inputs(structure, workdir, job_name, nproc=16, sup
     return 0
 
 def get_ModifiedMaterialsProject_VASP_inputs(structure, workdir, job_name, nproc=16, 
-            list_element_tuple = None, supplementary_incar_dict=None):
+                                U_strategy_instance = None, supplementary_incar_dict = None):
     """
     Inputs will be inspired by MaterialsProject, but this function is appropriate
     when we are seriously modifying the inputs such that they no longer conform to Materials Project.
@@ -309,26 +309,15 @@ def get_ModifiedMaterialsProject_VASP_inputs(structure, workdir, job_name, nproc
    
     incar  = input_set.get_incar(structure)
 
-    if list_element_tuple != None:
-        # The structure has many instances of the same element, which we 
-        # want VASP to treat as different. (ex: two Fe sites with different values of U).
-        # Pymatgen does not preserve structure decoration when it reads a CIF file, so we 
-        # must pass this information under the hood. Definitely not robust or elegant...
+    if U_strategy_instance != None:
+        #  reading the structure here insures consistency, rather
+        #  than having the strategy read the structure outside this driver.
+        U_strategy_instance.read_structure(structure)
 
-        #  We assume without check that the structure and the list are consistent!
-        list_new_species = []
-        for new_element, number, oxi_state in list_element_tuple:
-            if oxi_state != None:
-                new_specie = pymatgen.Specie(new_element,oxidation_state = oxi_state) 
-            else:
-                new_specie = pymatgen.Element(new_element)
+        # Generate all LDAU-related variables according to specified strategy.
+        LDAU_dict, poscar_need_hack, potcar_need_hack = U_strategy_instance.get_LDAU()
 
-            for i in np.arange(number):
-                list_new_species.append(new_specie)
-
-        for i, specie in enumerate(list_new_species):
-            structure.replace(i,specie) 
-
+        incar.update(LDAU_dict) 
 
     # set the number of parallel processors to sqrt(nproc), 
     # as recommended in manual.
@@ -349,37 +338,20 @@ def get_ModifiedMaterialsProject_VASP_inputs(structure, workdir, job_name, nproc
 
     hack_poscar_file(workdir)
 
-    if list_element_tuple != None:
-        # hack the potcar and the poscar to 
-        # have a same element on different sites treated as two different species 
 
-        hack_poscar_file_same_element_distinct_sites(workdir,list_element_tuple)
-    
-        new_potcar_symbols = []
-        for (symbol,number,decoration) in list_element_tuple: 
-            # the element symbol will certainly be in the potcar symbol
-            # find the closest condender and add to the new list;
-            # this should create duplicates.
+    if poscar_need_hack:
+        # do we need specialized hacking of the poscar because of the U strategy?       
+        new_poscar_lines = U_strategy_instance.get_new_poscar_lines()
+        with open(workdir+'POSCAR','w') as f:
+            for line in new_poscar_lines:
+                print >>f, line.strip()
 
-            # Careful! This is a bit tricky 'N' is in 'Na', so a better match
-            # algorithm is necessary
-            Found = False
-            for psymb in potcar.symbols:
-                if symbol == psymb.split('_')[0]:
-                    new_potcar_symbols.append(psymb) 
-                    Found = True
-                    break
-            if not Found:        
-                # Throw a fit
-                print('PSEUDOPOTENTIAL FOR %s NOT FOUND'%symbol )
-                print('this most certainly indicates a weakness in the algorithm used;')
-                print('review code; for now, FAIL HARD')
-                sys.exit()
-
+    if potcar_need_hack:
+        # do we need specialized hacking of the potcar because of the U strategy?       
+        new_potcar_symbols = U_strategy_instance.get_new_potcar_symbols(potcar)
         new_potcar = Potcar(new_potcar_symbols) 
         # overwrite the previous potcar
         new_potcar.write_file(workdir+'POTCAR')
-
 
     with open(workdir+'job.sh','w') as f:
         f.write(submit_template.format(job_name,nproc))
