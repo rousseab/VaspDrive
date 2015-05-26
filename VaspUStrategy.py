@@ -24,20 +24,31 @@ class U_Strategy(object):
 
         self._LDAU_KEYS = ['LDAUTYPE', 'LDAUPRINT', 'MAGMOM', 'LDAUL', 'LDAUJ', 'LDAUU', 'LDAU'] 
 
+        self.structure_has_been_read = False
+
 
     def read_structure(self,structure):
         """ 
         Get a copy of the structure object.         
         """
-
         # let's make sure we don't modifiy the input structure.
         # Side effects are bad practice!
         self.structure = structure.copy()
+        self.structure_has_been_read = True
+
+
+    def check_structure_is_read(self):
+        if not self.structure_has_been_read: 
+            print('NEED TO READ STRUCTURE BEFORE PROCEEDING FURTHER!')
+            sys.exit()
+
 
     def get_LDAU(self):
         """ Produce LDAU related variables, to be passed to VASP as strings """
 
         # let's simply use the Materials Project results as default.
+
+        self.check_structure_is_read()
 
         dummy_input_set = MPVaspInputSet()
         dummy_incar  = dummy_input_set.get_incar(self.structure)
@@ -69,50 +80,66 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
     we want to impose two different values of U on Fe, depending on its neighbors.
     """
 
-    def get_LDAU(self, U_Fe_N = 7., U_Fe_C = 3.):
-        """ Overload this method to deal with the specific HexaCyanoFerrate case. 
-            Different U values will be used for different Fe environments.
-        """
+    def __init__(self):
+
+        # create a boolean "state" variable which
+        # will be used to make sure the structure has been modified
+        # to account for different Fe sites having different U.
+        # This will serve to impose routines being called in the right order.
+        self.structure_has_been_read = False
+        self.structure_has_been_modified = False
+
+
+    def check_structure_is_modified(self):
+        """ I'm sure this can be done better with @property..."""
+        if not self.structure_has_been_modified: 
+            print('NEED TO MODIFY STRUCTURE BEFORE PROCEEDING FURTHER!')
+            sys.exit()
+
+    def modify_structure(self):
 
         Fe = pymatgen.Element('Fe')
-
-        Fe_hi = pymatgen.Specie('Fe',oxidation_state=4)
-        Fe_lo = pymatgen.Specie('Fe',oxidation_state=1)
-
+        self.Fe_hi = pymatgen.Specie('Fe',oxidation_state=4)
+        self.Fe_lo = pymatgen.Specie('Fe',oxidation_state=1)
         N = pymatgen.Element('N')
         C = pymatgen.Element('C')
 
         neibhor_distance = 2.6 # angstrom
+
         # Spoof pymatgen by substituting high spin iron and low spin iron.
         for i,site in enumerate(self.structure.sites):
             if site.specie == Fe:
                 neighbor = self.structure.get_neighbors(site,neibhor_distance)[0][0]
 
                 if neighbor.specie == N:
-                    self.structure.replace(i,Fe_hi)
+                    self.structure.replace(i,self.Fe_hi)
                 elif neighbor.specie == C:
-                    self.structure.replace(i,Fe_lo)
+                    self.structure.replace(i,self.Fe_lo)
 
         # Sort structure, so that decorated sites are 
         # next to each other
         self.structure.sort()
-        
-        # Force GGA+U on Fe site
-        LDAUJ = ''
-        LDAUL = ''
-        LDAUU = ''
-        MAGMOM = ''
+        self.structure_has_been_modified = True
+        return
 
+    def get_LDAU(self, U_Fe_N = 7., U_Fe_C = 3.):
+        """ Overload this method to deal with the specific HexaCyanoFerrate case. 
+            Different U values will be used for different Fe environments.
+        """
+
+        self.check_structure_is_read()
+
+        self.modify_structure()
 
         species_dict = OrderedDict()
         for s in self.structure.types_of_specie:
             species_dict[s] = 0.
 
             LDAUJ += ' 0'
-            if s == Fe_lo:
+            if s == self.Fe_lo:
                 LDAUL += ' 2'
                 LDAUU += ' %2.1f'%U_Fe_C
-            elif s == Fe_hi:
+            elif s == self.Fe_hi:
                 LDAUL += ' 2'
                 LDAUU += ' %2.1f'%U_Fe_N
             else:
@@ -124,9 +151,9 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
 
         for s in self.structure.types_of_specie:
 
-            if s == Fe_lo:
+            if s == self.Fe_lo:
                 MAGMOM += ' %i*1'%species_dict[s]  # low spin
-            elif s == Fe_hi:
+            elif s == self.Fe_hi:
                 MAGMOM += ' %i*5'%species_dict[s]  # high spin
 
             else:
@@ -144,3 +171,13 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
         potcar_need_hack = True
 
         return  LDAU_dict, poscar_need_hack, potcar_need_hack 
+
+    def hack_poscar(self):
+        """ nothing to do!"""
+        return
+
+    def hack_potcar(self):
+        """ nothing to do!"""
+        return
+
+
