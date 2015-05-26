@@ -5,6 +5,7 @@
 """
 
 import pymatgen
+from collections import OrderedDict
 from pymatgen.io.vaspio_set import MPVaspInputSet
 from pymatgen.io.vaspio.vasp_input import Poscar, Potcar
 
@@ -134,6 +135,11 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
         self.modify_structure()
 
         self.species_dict = OrderedDict()
+
+        # Initialize various strings
+        LDAUJ = ''
+        LDAUL = ''
+        LDAUU = ''
 
         for s in self.structure.types_of_specie:
             self.species_dict[s] = 0.
