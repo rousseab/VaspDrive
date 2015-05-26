@@ -137,6 +137,50 @@ def hack_potcar_file(workdir,list_potcar_singles):
 
     return
 
+def substitution_GGA_U_VASP(structure, workdir, Alkali='Na',nproc=16, dry_run=False, run_template=None):
+    """
+    This function will perform the menial tasks generating input and launching
+    jobs, creating workdir along the way if it doesn't exist.
+
+    This is more flexible than Generate_Relax_GGA_U_VASP, which will be useful
+    for substituting various elements in the structure.
+    """
+
+    A = pymatgen.Element(Alkali)
+
+    try:
+        os.makedirs(workdir+'/CIF/')
+    except:       
+        print 'directory already exists. Continue...'
+
+    os.chdir(workdir)
+
+    formula  = structure.formula.replace(' ','')
+
+    cif_filename = os.path.abspath('.')+'/CIF/'+formula+'.cif'
+
+    structure.to(fmt='cif',filename=cif_filename)
+
+    if not os.path.isdir(formula):
+        os.mkdir(formula)
+    os.chdir(formula)
+
+    if not os.path.isdir('SGGA_U_Relaxation'):
+        os.mkdir('SGGA_U_Relaxation') 
+    os.chdir('SGGA_U_Relaxation') 
+
+    file = open('run.py','w')
+
+
+    print >> file, run_template.format(formula, cif_filename, nproc)
+    file.close()
+
+    if not dry_run:
+        os.system('python run.py')
+    os.chdir('../../../')
+
+
+    return
 
 #===========================================
 # helper routines
@@ -295,10 +339,8 @@ def get_ModifiedMaterialsProject_VASP_inputs(structure, workdir, job_name, nproc
 
     poscar = input_set.get_poscar(structure)
 
-
     kpoints = input_set.get_kpoints(structure)
     potcar = input_set.get_potcar(structure)
-
 
     incar.write_file(workdir+'INCAR')
     poscar.write_file(workdir+'POSCAR')
