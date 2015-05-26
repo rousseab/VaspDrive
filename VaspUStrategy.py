@@ -6,6 +6,8 @@
 
 import pymatgen
 from pymatgen.io.vaspio_set import MPVaspInputSet
+from pymatgen.io.vaspio.vasp_input import Poscar, Potcar
+
 
 import numpy as np
 
@@ -65,7 +67,7 @@ class U_Strategy(object):
 
         return LDAU_dict, poscar_need_hack, potcar_need_hack  
 
-    def hack_poscar(self):
+    def get_new_poscar_lines(self):
         """ nothing to do!"""
         return
 
@@ -131,9 +133,10 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
 
         self.modify_structure()
 
-        species_dict = OrderedDict()
+        self.species_dict = OrderedDict()
+
         for s in self.structure.types_of_specie:
-            species_dict[s] = 0.
+            self.species_dict[s] = 0.
 
             LDAUJ += ' 0'
             if s == self.Fe_lo:
@@ -147,19 +150,19 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
                 LDAUU += ' 0'
 
         for s in self.structure.sites:
-            species_dict[s.specie] += 1.
+            self.species_dict[s.specie] += 1.
 
         for s in self.structure.types_of_specie:
 
             if s == self.Fe_lo:
-                MAGMOM += ' %i*1'%species_dict[s]  # low spin
+                MAGMOM += ' %i*1'%self.species_dict[s]  # low spin
             elif s == self.Fe_hi:
-                MAGMOM += ' %i*5'%species_dict[s]  # high spin
+                MAGMOM += ' %i*5'%self.species_dict[s]  # high spin
 
             else:
-                MAGMOM += ' %i*0.6'%species_dict[s] 
+                MAGMOM += ' %i*0.6'%self.species_dict[s] 
 
-        LDAU_dict = { 'LDAU':True       # use LDA+U (GGA+U in fact)
+        LDAU_dict = { 'LDAU':True,      # use LDA+U (GGA+U in fact)
                       'LDAUTYPE':2,     # simplified Dudarev Formalism
                       'LDAUPRINT':1,    # talk to me
                       'MAGMOM':MAGMOM,  # magnetic moments
@@ -172,9 +175,35 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
 
         return  LDAU_dict, poscar_need_hack, potcar_need_hack 
 
-    def hack_poscar(self):
-        """ nothing to do!"""
-        return
+    def get_new_poscar_lines(self):
+        """
+        Pymatgen does not realize that decorated elements (species) should be
+        treated as different sites in VASP.
+
+        This routine hacks the poscar file (which has already been hacked to go from 5.x to 4.6)
+        to include the correct number of distinct sites.
+        """
+
+        self.check_structure_is_modified()
+
+        # get a poscar consistent with the internally modified structure
+        poscar = Poscar(self.structure)
+
+        raw_lines = poscar.get_string().split('\n')
+
+        # get rid of line 5, which is VASP 5.x and crashes VASP 4.6
+        lines = []
+        for line in raw_lines[:5]+raw_lines[6:]:
+            lines.append(line)            
+
+        hack_line = ''
+        for element, number in self.species_dict.items():
+            hack_line += ' %i'%number
+
+        lines[5] = hack_line
+
+        return lines
+
 
     def hack_potcar(self):
         """ nothing to do!"""
