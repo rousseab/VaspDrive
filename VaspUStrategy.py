@@ -71,7 +71,7 @@ class U_Strategy(object):
         """ nothing to do!"""
         return
 
-    def hack_potcar(self):
+    def get_new_potcar_symbols(self,old_potcar):
         """ nothing to do!"""
         return
 
@@ -205,8 +205,33 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
         return lines
 
 
-    def hack_potcar(self):
-        """ nothing to do!"""
-        return
+    def get_new_potcar_symbols(self, old_potcar):
+        """ Get potcar symbols, accounting for repetition of Fe in the structure"""
+    
+        self.check_structure_is_modified()
+
+        new_potcar_symbols = []
+
+        for element, number in self.species_dict.items():
+            # the element symbol will certainly be in the potcar symbol
+            # find the closest condender and add to the new list;
+            # this should create duplicates.
+
+            # Careful! This is a bit tricky 'N' is in 'Na', so a better match
+            # algorithm is necessary
+            Found = False
+            for psymb in old_potcar.symbols:
+                if symbol == psymb.split('_')[0]:
+                    new_potcar_symbols.append(psymb) 
+                    Found = True
+                    break
+            if not Found:        
+                # Throw a fit
+                print('PSEUDOPOTENTIAL FOR %s NOT FOUND'%symbol )
+                print('this most certainly indicates a weakness in the algorithm used;')
+                print('review code; for now, FAIL HARD')
+                sys.exit()
+
+        return new_potcar_symbols
 
 
