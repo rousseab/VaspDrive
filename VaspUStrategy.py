@@ -140,6 +140,7 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
         LDAUJ = ''
         LDAUL = ''
         LDAUU = ''
+        MAGMOM = ''
 
         for s in self.structure.types_of_specie:
             self.species_dict[s] = 0.
@@ -219,6 +220,8 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
         new_potcar_symbols = []
 
         for element, number in self.species_dict.items():
+
+            symbol = element.symbol
             # the element symbol will certainly be in the potcar symbol
             # find the closest condender and add to the new list;
             # this should create duplicates.
