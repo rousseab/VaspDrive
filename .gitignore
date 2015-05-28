@@ -1,2 +1,5 @@
 *.pyc
 *.swp
+*VaspDrive.egg-info/
+*build/
+*dist/
