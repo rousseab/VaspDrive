@@ -3,6 +3,7 @@
 """
 
 from fireworks.user_objects.firetasks.script_task import ScriptTask
+from pymatgen import Structure
 
 from fireworks.core.firework import FireTaskBase, FWAction
 from VaspSubmission import *
@@ -29,7 +30,10 @@ class BuildVaspInputTask(FireTaskBase):
         if they are absent.
         """
 
-        self.structure = d['structure']
+        # It appears the structure gets serialized into a dictionary by the action of writing
+        # the specs. Let's give it life again!
+        self.structure = Structure.from_dict(d['structure'])
+
         self.workdir = d['workdir']
         self.job_name = d['job_name']
 
