@@ -5,6 +5,7 @@
 from fireworks.user_objects.firetasks.script_task import ScriptTask
 
 from fireworks.core.firework import FireTaskBase, FWAction
+from VaspSubmission import *
 
 
 class BuildVaspInputTask(FireTaskBase):
@@ -12,7 +13,6 @@ class BuildVaspInputTask(FireTaskBase):
 
     required_params = ["structure", "workdir", "job_name"]
     optional_params = ["nproc", "supplementary_incar_dict"]
-
 
     _fw_name = 'BuildVaspInputTask'
 
