@@ -282,7 +282,6 @@ def get_MaterialsProject_VASP_inputs(structure, workdir, job_name, nproc=16, sup
 
     hack_poscar_file(workdir)
 
-
     with open(workdir+'job.sh','w') as f:
         f.write(submit_template.format(job_name,nproc))
 
