@@ -14,3 +14,7 @@ Here I want to develop and curate a suite of tools that I can use to perform
     - analysis
 leveraging existing technology, with nothing else in mind than my own convenience. 
 
+I *know* Pymatgen+Custodian+Fireworks (as MPworks) does everything better/faster/stronger/scooter,
+but I want to understand what I'm doing, and I want to launch jobs yesterday, not six months from now.
+I can introduce sophistication progessively as I run useful computations, instead of drinking from the 
+MPworks firehose.
