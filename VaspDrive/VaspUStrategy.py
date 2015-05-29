@@ -175,7 +175,8 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
                       'MAGMOM':MAGMOM,  # magnetic moments
                       'LDAUL':LDAUL, 
                       'LDAUJ':LDAUJ, 
-                      'LDAUU':LDAUU}
+                      'LDAUU':LDAUU,
+                      'LMAXMIX':4} # this is essential for d-element GGA+U, but not the VASP default
 
         poscar_need_hack = True
         potcar_need_hack = True
