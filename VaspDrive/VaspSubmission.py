@@ -7,7 +7,7 @@ import numpy as np
 import os
 
 from pymatgen import read_structure, write_structure
-from pymatgen.io.vaspio.vasp_input import Incar, Poscar, Kpoints, Potcar, VaspInput, PotcarSingle
+from pymatgen.io.vaspio.vasp_input import Incar, Poscar, Kpoints, Potcar,  PotcarSingle
 from pymatgen.io.vaspio.vasp_output import Vasprun
 
 from pymatgen.io.vaspio_set import MPVaspInputSet, MPNonSCFVaspInputSet
@@ -234,14 +234,16 @@ def get_VASP_inputs(structure, workdir, job_name, nproc=64, kppa=500, extra_inca
         incar_dict.update( extra_incar_dict  )
 
     incar   = Incar.from_dict(incar_dict )
-    vinput  = VaspInput(incar, kpoints, poscar, potcar)
-    vinput.write_input(output_dir=workdir)
+
+
+    incar.write_file(workdir+'INCAR')
+    poscar.write_file(workdir+'POSCAR', vasp4_compatible = True)
+    kpoints.write_file(workdir+'KPOINTS')
+    potcar.write_file(workdir+'POTCAR')
+
 
     potcar.sort()
-
-    hack_poscar_file(workdir)
     hack_potcar_file(workdir,list_potcar_singles)
-
     
 
     with open(workdir+'job.sh','w') as f:
