@@ -54,6 +54,7 @@ clean_template = """
 rm -rf CHG DOSCAR IBZKPT OSZICAR output.txt res_out.txt vasprun.xml XDATCAR CHGCAR CONTCAR EIGENVAL machines OUTCAR PCDAT WAVECAR
 """
 
+
 #===========================================
 # Hacking output of pymatgen, because
 # I'm using VASP 4.6 and not VASP 5.x
@@ -276,11 +277,10 @@ def get_MaterialsProject_VASP_inputs(structure, workdir, job_name, nproc=16, sup
     potcar = input_set.get_potcar(structure)
 
     incar.write_file(workdir+'INCAR')
-    poscar.write_file(workdir+'POSCAR')
+    poscar.write_file(workdir+'POSCAR', vasp4_compatible = True)
     kpoints.write_file(workdir+'KPOINTS')
     potcar.write_file(workdir+'POTCAR')
 
-    hack_poscar_file(workdir)
 
     with open(workdir+'job.sh','w') as f:
         f.write(submit_template.format(job_name,nproc))
