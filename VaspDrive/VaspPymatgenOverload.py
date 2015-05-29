@@ -196,3 +196,37 @@ class TetrahedronDosSet(MPNonSCFVaspInputSet):
         kpoints = Kpoints.automatic_gamma_density(structure, kppa)
 
         return kpoints
+
+    def write_input(self, structure, output_dir,
+                    make_dir_if_not_present=True, include_cif=False):
+        """
+        Writes a set of VASP input to a directory.
+
+        Must be overloaded to be compatible with VASP 4.6.
+
+        Args:
+            structure (Structure/IStructure): Structure to write VASP input
+                files for.
+            output_dir (str): Directory to output the VASP input files
+            make_dir_if_not_present (bool): Set to True if you want the
+                directory (and the whole path) to be created if it is not
+                present.
+            include_cif (bool): Whether to write a CIF file in the output
+                directory for easier opening by VESTA.
+        """
+        if make_dir_if_not_present and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        for k, v in self.get_all_vasp_input(structure).items():
+
+            if k == 'POSCAR':
+                v.write_file(os.path.join(output_dir, k), vasp4_compatible = True)
+
+            else:
+                v.write_file(os.path.join(output_dir, k))
+
+            if k == "POSCAR" and include_cif:
+                v.structure.to(
+                    filename=os.path.join(output_dir,
+                                          "%s.cif" % v.structure.formula))
+
+
