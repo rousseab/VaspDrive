@@ -104,10 +104,15 @@ def extract_json_data():
 
         relaxation_data = []
         for step in vr.ionic_steps:
-            relaxation_data.append( {    'forces': step['forces'], 
-                                      'structure': step['structure'],
-                                         'stress': step['stress'],
-                                     'electronic': step['electronic_steps'][-1]})
+
+            data_dict = {}
+            for key in ['forces','structure','stress']:
+                if key in step:
+                    data_dict[key] = step[key]
+
+            data_dict['electronic'] = step['electronic_steps'][-1]
+
+            relaxation_data.append(data_dict)
 
         dictionary_data['relaxation'] = relaxation_data 
 
