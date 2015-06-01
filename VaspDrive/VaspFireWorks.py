@@ -42,15 +42,17 @@ class MyTestTask(FireTaskBase):
     def run_task(self, fw_spec):
 
         launch_dir = fw_spec['_launch_dir']
-        iteration_number = self.find_iteration_number(launch_dir.strip('/'))
+        counter    = fw_spec['counter']
 
-        x = np.random.random(1)[0]
-        with open('test_file_%i.txt'%iteration_number,'w') as f:
+        x = 0.05*counter
+        with open('test_file_%i.txt'%counter,'w') as f:
             print >> f, 'x = %8.4f'%x
 
-        if x < 0.8:
-            new_launch_dir = launch_dir.replace('%i'%iteration_number,'%i'%(iteration_number+1))
-            new_fw_spec = dict( _launch_dir = new_launch_dir) 
+        if x < 0.5:
+            new_counter = counter+1
+            new_launch_dir = launch_dir.replace('relax_V%i'%counter,'relax_V%i'%new_counter)
+            new_fw_spec = dict( _launch_dir = new_launch_dir,
+                                counter = new_counter)
 
             new_fw = Firework(MyTestTask(), new_fw_spec )
             return FWAction(stored_data={'x': x}, additions=new_fw)
