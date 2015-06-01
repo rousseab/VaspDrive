@@ -153,10 +153,10 @@ class MyVaspFireTask(FireTaskBase):
         kpoints = input_set.get_kpoints(structure)
         potcar = input_set.get_potcar(structure)
 
-        incar.write_file(workdir+'INCAR')
-        poscar.write_file(workdir+'POSCAR', vasp4_compatible = True)
-        kpoints.write_file(workdir+'KPOINTS')
-        potcar.write_file(workdir+'POTCAR')
+        incar.write_file('INCAR')
+        poscar.write_file('POSCAR', vasp4_compatible = True)
+        kpoints.write_file('KPOINTS')
+        potcar.write_file('POTCAR')
 
         if poscar_need_hack:
             # do we need specialized hacking of the poscar because of the U strategy?       
@@ -173,7 +173,7 @@ class MyVaspFireTask(FireTaskBase):
             new_potcar_symbols = U_strategy_instance.get_new_potcar_symbols(potcar)
             new_potcar = Potcar(new_potcar_symbols) 
             # overwrite the previous potcar
-            new_potcar.write_file(workdir+'POTCAR')
+            new_potcar.write_file('POTCAR')
 
         with open('job.sh','w') as f:
             f.write(job_template)
