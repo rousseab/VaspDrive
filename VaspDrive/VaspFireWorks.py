@@ -13,6 +13,7 @@ from VaspDrive.VaspSubmission import *
 from VaspDrive.VaspUStrategy import *
 
 import re
+import sys
 
 job_template = """#!/bin/bash
 
@@ -111,7 +112,7 @@ class MyVaspFireTask(FireTaskBase):
             self.supplementary_incar_dict = None
 
         if 'strategy_type' in d:
-            if  'strategy_type' == 'HexaCyanoFerrate':
+            if  d['strategy_type'] == 'HexaCyanoFerrate':
                 self.U_strategy = U_Strategy_HexaCyanoFerrate()
             else:
                 print("UNKNOWN STRATEGY! FAIL HARD")
