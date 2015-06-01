@@ -8,7 +8,10 @@ from fireworks import Firework
 from pymatgen import Structure
 
 from fireworks.core.firework import FireTaskBase, FWAction
-from VaspSubmission import *
+from VaspDrive.VaspSubmission import *
+
+from VaspDrive.VaspUStrategy import *
+
 import re
 
 job_template = """#!/bin/bash
@@ -73,6 +76,7 @@ class MyVaspFireTask(FireTaskBase):
 
     def run_task(self, fw_spec):
 
+
         launch_dir = fw_spec['_launch_dir']
 
         self._load_params(fw_spec)
@@ -81,7 +85,7 @@ class MyVaspFireTask(FireTaskBase):
                 U_strategy_instance = self.U_strategy, supplementary_incar_dict = self.supplementary_incar_dict)
 
         # execute the BASH script
-        os.system('bash job.sh')           
+        #os.system('bash job.sh')           
 
 
 
@@ -106,8 +110,12 @@ class MyVaspFireTask(FireTaskBase):
         else:
             self.supplementary_incar_dict = None
 
-        if 'U_strategy' in d:
-            self.U_strategy = d['U_strategy']
+        if 'strategy_type' in d:
+            if  'strategy_type' == 'HexaCyanoFerrate':
+                self.U_strategy = U_Strategy_HexaCyanoFerrate()
+            else:
+                print("UNKNOWN STRATEGY! FAIL HARD")
+                sys.exit()
         else:
             self.U_strategy = None
         
