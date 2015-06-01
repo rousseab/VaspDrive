@@ -3,11 +3,13 @@
 """
 
 from fireworks.user_objects.firetasks.script_task import ScriptTask
+from fireworks import Firework
+
 from pymatgen import Structure
 
 from fireworks.core.firework import FireTaskBase, FWAction
 from VaspSubmission import *
-
+import re
 
 class BuildVaspInputTask(FireTaskBase):
     """ FireWork task which wraps around the generation of VASP inputs """
@@ -47,3 +49,39 @@ class BuildVaspInputTask(FireTaskBase):
         else:
             self.supplementary_incar_dict = None
 
+
+
+class MyTestTask(FireTaskBase):
+    """ Simple test task to play with Fireworks' various functionalities.
+        Not directly related to Vasp per se.
+    """
+
+    _fw_name = "A Simple Test Task"
+
+    def run_task(self, fw_spec):
+
+        launch_dir = fw_spec['_launch_dir']
+        iteration_number = self.find_iteration_number(launch_dir.strip('/'))
+
+        x = np.random.random(1)[0]
+        with open('test_file_%i.txt'%iteration_number,'w') as f:
+            print >> f, 'x = %8.4f'%x
+
+        if x < 0.8:
+            new_launch_dir = launch_dir.replace('%i'%iteration_number,'%i'%(iteration_number+1))
+            new_fw_spec = dict( _launch_dir = new_launch_dir) 
+
+            new_fw = Firework(MyTestTask(), new_fw_spec )
+            return FWAction(stored_data={'x': x}, additions=new_fw)
+
+        else:            
+            return FWAction()
+
+
+    def find_iteration_number(self,launch_dir):
+        
+        last_string = launch_dir.split('/')[-1]
+
+        number = int(re.search(r'\d+', last_string).group())
+
+        return number
