@@ -323,7 +323,6 @@ def get_ModifiedMaterialsProject_VASP_inputs(structure, workdir, job_name, nproc
     potcar.write_file(workdir+'POTCAR')
 
 
-
     if poscar_need_hack:
         # do we need specialized hacking of the poscar because of the U strategy?       
         new_poscar_lines = U_strategy_instance.get_new_poscar_lines()
