@@ -62,23 +62,6 @@ class MyTestTask(FireTaskBase):
 
         return number
 
-class BuildVaspInputTask(FireTaskBase):
-    """ FireWork task which wraps around the generation of VASP inputs """
-
-    required_params = ["structure", "workdir", "job_name"]
-    optional_params = ["nproc", "supplementary_incar_dict"]
-
-    _fw_name = 'BuildVaspInputTask'
-
-    def run_task(self, fw_spec):
-        """ overload the run_task method to write the Vasp input """
-        self._load_params(self)
-
-        check = get_MaterialsProject_VASP_inputs(self.structure, self.workdir, self.job_name, 
-                                    nproc=self.nproc, supplementary_incar_dict = self.supplementary_incar_dict)
-
-
-
 
 class MyVaspFireTask(FireTaskBase):
     """
