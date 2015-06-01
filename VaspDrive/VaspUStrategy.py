@@ -4,8 +4,9 @@
    on the ordering in the CIF file.
 """
 
+from copy import deepcopy
 import pymatgen
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from pymatgen.io.vaspio_set import MPVaspInputSet
 from pymatgen.io.vaspio.vasp_input import Poscar, Potcar
 
@@ -99,31 +100,112 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
             print('NEED TO MODIFY STRUCTURE BEFORE PROCEEDING FURTHER!')
             sys.exit()
 
-    def modify_structure(self):
+    def _modify_structure(self):
+
+        # We'll use "oxidation_state" as a stand-in for "magnetisation"
+        # surrounded by nitrogen
+        self.Fe_HS_2plus = pymatgen.Specie('Fe',oxidation_state=4)
+        self.Fe_HS_3plus = pymatgen.Specie('Fe',oxidation_state=5)
+
+        # surrounded by carbon
+        self.Fe_LS_2plus = pymatgen.Specie('Fe',oxidation_state=0)
+        self.Fe_LS_3plus = pymatgen.Specie('Fe',oxidation_state=1)
 
         Fe = pymatgen.Element('Fe')
-        self.Fe_hi = pymatgen.Specie('Fe',oxidation_state=4)
-        self.Fe_lo = pymatgen.Specie('Fe',oxidation_state=1)
+        Na = pymatgen.Element('Na')
         N = pymatgen.Element('N')
         C = pymatgen.Element('C')
 
+
+        Na_indices = self.structure.indices_from_symbol('Na')
+        
         neibhor_distance = 2.6 # angstrom
 
-        # Spoof pymatgen by substituting high spin iron and low spin iron.
+        # Interrogate the structure: for each Fe, what is the site index, the nearest neighbor
+        # and the distance to Na?
+
+        # create a nice verbose object for this job
+        Iron_Ion = namedtuple('Iron_Ion',['structure_index', 'neighbor', 'distance_to_Na'])
+
+        # Count the number of reducing electrons which must be introduced
+        number_of_reducing_electrons = self.structure.composition['Na']
+
+
+        list_Fe_ions = []
+
+        # Identify all the Fe ions in the structure 
         for i,site in enumerate(self.structure.sites):
             if site.specie == Fe:
-                neighbor = self.structure.get_neighbors(site,neibhor_distance)[0][0]
+                neighbor = self.structure.get_neighbors(site,neibhor_distance)[0][0].specie
 
-                if neighbor.specie == N:
-                    self.structure.replace(i,self.Fe_hi)
-                elif neighbor.specie == C:
-                    self.structure.replace(i,self.Fe_lo)
+                if number_of_reducing_electrons > 0:
+                    distance = np.min(self.structure.distance_matrix[i,Na_indices])
+                else:
+                    distance = np.infty
+
+                list_Fe_ions.append( Iron_Ion(i,neighbor,distance) )
+
+        # Spoof pymatgen by substituting reduced iron for the plain vanilla Fe.
+        while number_of_reducing_electrons > 0:
+            next_ion = self.find_next_site_to_reduce_pop(list_Fe_ions)
+
+            if next_ion.neighbor == N:
+                self.structure.replace(next_ion.structure_index,self.Fe_HS_2plus )
+            elif next_ion.neighbor == C:
+                self.structure.replace(next_ion.structure_index,self.Fe_LS_2plus )
+
+            number_of_reducing_electrons -= 1
+
+        # Spoof pymatgen by substituting oxidized iron for the plain vanilla Fe for the remaining sites
+        for next_ion in list_Fe_ions:
+            if next_ion.neighbor == N:
+                self.structure.replace(next_ion.structure_index,self.Fe_HS_3plus )
+            elif next_ion.neighbor == C:
+                self.structure.replace(next_ion.structure_index,self.Fe_LS_3plus )
 
         # Sort structure, so that decorated sites are 
         # next to each other
         self.structure.sort()
         self.structure_has_been_modified = True
         return
+
+
+    def find_next_site_to_reduce_pop(self,list_Fe_ions):
+        """
+        Identify the next item to be reduced, with the rules:
+            - reduce Fe-C before Fe-N
+            - reduce Fe nearest Na first
+        """
+        N = pymatgen.Element('N')
+        C = pymatgen.Element('C')
+
+        # Are there Fe-C ions?
+        sub_list_Fe_ions = []
+        for ion in list_Fe_ions:
+            if ion.neighbor == C:
+                sub_list_Fe_ions.append(ion)
+
+        if len(sub_list_Fe_ions) == 0:
+            # there are no Fe-C ion. They must all be Fe-N
+            sub_list_Fe_ions = deepcopy(list_Fe_ions)
+
+        # Find the site with the smallest Na distance
+        sub_list_Na_d = []
+        for ion in sub_list_Fe_ions:
+            sub_list_Na_d.append(ion.distance_to_Na)
+
+        next_ion = sub_list_Fe_ions[ np.argmin(sub_list_Na_d) ]
+
+
+        # identify index of the identified ion, and 
+        # pop it out of the list
+        for i, ion in enumerate(list_Fe_ions):
+            if ion == next_ion:
+                list_Fe_ions.pop(i)
+                break
+
+        return next_ion
+
 
     def get_LDAU(self, U_Fe_N = 7., U_Fe_C = 3.):
         """ Overload this method to deal with the specific HexaCyanoFerrate case. 
@@ -132,9 +214,8 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
 
         self.check_structure_is_read()
 
-        self.modify_structure()
+        self._modify_structure()
 
-        self.species_dict = OrderedDict()
 
         # Initialize various strings
         LDAUJ = ''
@@ -142,32 +223,46 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
         LDAUU = ''
         MAGMOM = ''
 
+        # count the number of each species. 
+        #   NOTE: pymatgen.composition does not understand decorations;
+        #         we have to hack this way.
+
+        self.species_dict = OrderedDict()
+
         for s in self.structure.types_of_specie:
             self.species_dict[s] = 0.
 
+        for s in self.structure.sites:
+            self.species_dict[s.specie] += 1.
+
+        # Generate MAGMOM, which must distinguish every magnetization state
+        for s in self.structure.types_of_specie:
+
+            if s == self.Fe_HS_2plus:
+                MAGMOM += ' %i*4'%self.species_dict[s]  # low spin
+            elif s == self.Fe_HS_3plus:
+                MAGMOM += ' %i*5'%self.species_dict[s]  # high spin
+            elif s == self.Fe_LS_2plus:
+                MAGMOM += ' %i*0'%self.species_dict[s]  # low spin
+            elif s == self.Fe_LS_3plus:
+                MAGMOM += ' %i*1'%self.species_dict[s]  # high spin
+            else:
+                MAGMOM += ' %i*0.6'%self.species_dict[s] 
+
+
+        for s in self.structure.types_of_specie:
             LDAUJ += ' 0'
-            if s == self.Fe_lo:
+
+            if s == self.Fe_LS_2plus or s == self.Fe_LS_3plus: 
                 LDAUL += ' 2'
                 LDAUU += ' %2.1f'%U_Fe_C
-            elif s == self.Fe_hi:
+            elif s == self.Fe_HS_2plus or s == self.Fe_HS_3plus: 
                 LDAUL += ' 2'
                 LDAUU += ' %2.1f'%U_Fe_N
             else:
                 LDAUL += ' 0'
                 LDAUU += ' 0'
 
-        for s in self.structure.sites:
-            self.species_dict[s.specie] += 1.
-
-        for s in self.structure.types_of_specie:
-
-            if s == self.Fe_lo:
-                MAGMOM += ' %i*1'%self.species_dict[s]  # low spin
-            elif s == self.Fe_hi:
-                MAGMOM += ' %i*5'%self.species_dict[s]  # high spin
-
-            else:
-                MAGMOM += ' %i*0.6'%self.species_dict[s] 
 
         LDAU_dict = { 'LDAU':True,      # use LDA+U (GGA+U in fact)
                       'LDAUTYPE':2,     # simplified Dudarev Formalism
@@ -197,13 +292,8 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
         # get a poscar consistent with the internally modified structure
         poscar = Poscar(self.structure)
 
-        raw_lines = poscar.get_string().split('\n')
-
-        # get rid of line 5, which is VASP 5.x and crashes VASP 4.6
-        lines = []
-        for line in raw_lines[:5]+raw_lines[6:]:
-            lines.append(line)            
-
+        lines = poscar.get_string(vasp4_compatible=True).split('\n')
+        
         hack_line = ''
         for element, number in self.species_dict.items():
             hack_line += ' %i'%number
