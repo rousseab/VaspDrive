@@ -13,6 +13,7 @@ from VaspDrive.VaspSubmission import *
 from VaspDrive.VaspUStrategy import *
 
 import re
+import os
 import sys
 
 job_template = """#!/bin/bash
@@ -86,7 +87,7 @@ class MyVaspFireTask(FireTaskBase):
                 U_strategy_instance = self.U_strategy, supplementary_incar_dict = self.supplementary_incar_dict)
 
         # execute the BASH script
-        #os.system('bash job.sh')           
+        os.system('bash job.sh')           
 
 
 
