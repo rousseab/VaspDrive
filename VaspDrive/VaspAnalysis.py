@@ -95,30 +95,38 @@ class AnalyseJsonData():
 
     def __init__(self,list_json_data_filenames):
 
-        self.list_json_data_filenames = list_json_data_filenames 
 
-        self.parse_json_data()
+        self.parse_json_data(list_json_data_filenames)
 
         return
 
-    def parse_json_data(self):
+    def parse_json_data(self,list_json_data_filenames):
+
         self.list_data_dictionaries = []
         self.list_structures        = []
+        self.list_functional_json_data_filenames = []
 
 
-        for json_data_filename in self.list_json_data_filenames:
+        for json_data_filename in list_json_data_filenames:
             with open(json_data_filename ,'r') as f:
-
                 try:
                     data_dictionary = json.load(f)
-                    self.list_data_dictionaries.append(data_dictionary) 
 
                     structure_dict = data_dictionary['relaxation'][-1]['structure']
                     structure = pymatgen.Structure.from_dict(structure_dict)
 
-                    self.list_structures.append(structure)
+                    # make sure this exists, or else the file is broken
+                    energy = data_dictionary['relaxation'][-1]['electronic']['e_0_energy']
+
                 except:
                     print( 'file %s is broken'%json_data_filename)
+                    continue                        
+            # if file is not broken, tabulate data
+
+            self.list_functional_json_data_filenames.append(json_data_filename) 
+            self.list_data_dictionaries.append(data_dictionary) 
+            self.list_structures.append(structure)
+
 
         return
 
