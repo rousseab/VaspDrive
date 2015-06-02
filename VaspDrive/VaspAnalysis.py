@@ -6,6 +6,7 @@ import numpy as np
 import os
 import sys
 import json
+import re
 
 import pymatgen
 
@@ -270,3 +271,76 @@ class AnalyseMaterialsProjectJsonData_NoProcess(AnalyseMaterialsProjectJsonData)
         #processed_entries = self.compat.process_entries(computed_entries)
 
         return computed_entries 
+
+
+
+class AnalyseDensityMatrix(object):
+    """ Class to parse the density matrix out of the OUTCAR file (if present) """
+
+
+    def __init__(self,outcar_file_path):
+
+        self.outcar_file_path = outcar_file_path
+
+
+    def parse_outcar(self):
+
+        # find the last Iteration in the file
+        pattern = 'Iteration'  
+        with open(self.outcar_file_path,'r') as file:
+            for line in file:
+                if re.search(pattern, line):
+                    last_interation = line
+
+        print last_interation 
+
+        # Parse the last iteration block
+        save_to_block = False
+        block = []
+        with open(self.outcar_file_path,'r') as file:
+            for line in file:
+                if line == last_interation: 
+                    save_to_block = True
+
+                elif '----------------' in line: 
+                    save_to_block = False
+
+                if save_to_block: 
+                    #block.append(line.rstrip())
+                    block.append(line)
+
+
+        list_density_matrices = self.parse_block(block)
+
+        return list_density_matrices 
+
+
+    def parse_block(self,block):
+
+        list_density_matrices = []
+
+        for il, line in enumerate(block):
+            if 'atom =' in line:  
+                l = int(line.strip().split()[-1])
+                if l == 2:
+                    sub_block_up = block[il+6:il+11]
+                    dm_up = self.parse_sub_block(sub_block_up)
+
+                    sub_block_dn = block[il+14:il+19]
+                    dm_dn = self.parse_sub_block(sub_block_dn)
+                    
+                    list_density_matrices.append([dm_up,dm_dn])
+
+
+        return list_density_matrices
+
+    def parse_sub_block(self,sub_block):
+
+        density_matrix = []
+        for line in sub_block:
+            density_matrix.append(map(lambda str:float(str), line.split())[:5])
+
+        return np.array(density_matrix)
+            
+
+        return
