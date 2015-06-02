@@ -207,7 +207,7 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
         return next_ion
 
 
-    def get_LDAU(self, U_Fe_N = 7., U_Fe_C = 3.):
+    def get_LDAU(self, U_Fe_N = 7., U_Fe_C = 5.):
         """ Overload this method to deal with the specific HexaCyanoFerrate case. 
             Different U values will be used for different Fe environments.
         """
