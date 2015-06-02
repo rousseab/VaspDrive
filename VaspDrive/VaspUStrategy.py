@@ -335,3 +335,15 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
         return new_potcar_symbols
 
 
+class U_Strategy_HexaCyanoFerrate_U_is_5_7(U_Strategy_HexaCyanoFerrate):
+    """
+    Derived Class to treat specifically the case of hexacyanoferrate, where
+    we want to impose two different values of U on Fe, depending on its neighbors.
+
+    This derived class simply changes the default values of the U parameters.
+    """
+
+    def get_LDAU(self):
+        super(U_Strategy_HexaCyanoFerrate_U_is_5_7, self).get_LDAU(U_Fe_N = 7., U_Fe_C = 5.)
+
+
