@@ -219,7 +219,8 @@ class MyVaspFireTask(FireTaskBase):
         input_set = TetrahedronDosSet.from_previous_vasp_run(previous_vasp_dir,
                     kpoints_density=kpoints_density, user_incar_settings=supplementary_incar_dict)
 
-
+        poscar_need_hack = False
+        potcar_need_hack = False
         if U_strategy_instance != None:
             #  reading the structure here insures consistency, rather
             #  than having the strategy read the structure outside this driver.
