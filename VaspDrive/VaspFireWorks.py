@@ -1,7 +1,8 @@
 """
  Implementation of FireWorks workflows for my own calculations.
 """
-
+import os
+import shutil
 from fireworks.user_objects.firetasks.script_task import ScriptTask
 from fireworks import Firework
 
@@ -9,6 +10,7 @@ from pymatgen import Structure
 
 from fireworks.core.firework import FireTaskBase, FWAction
 from VaspDrive.VaspSubmission import *
+from VaspDrive.VaspExtract import *
 
 from VaspDrive.VaspUStrategy import *
 
@@ -80,17 +82,35 @@ class MyVaspFireTask(FireTaskBase):
 
     def run_task(self, fw_spec):
 
-
         launch_dir = fw_spec['_launch_dir']
 
         self._load_params(fw_spec)
 
-        self.generate_VASP_inputs(self.structure, self.job_name, self.nproc, 
-                U_strategy_instance = self.U_strategy, supplementary_incar_dict = self.supplementary_incar_dict)
 
-        # execute the BASH script
+        if 'previous_launch_dir' in fw_spec:
+            src = fw_spec['previous_launch_dir']+'/CHGCAR'
+            dst = launch_dir+'/CHGCAR'
+            shutil.move(src, dst)            
+
+        if self.job_type == 'relax' or self.job_type == 'ground_state':
+            check = self.generate_VASP_inputs(self.structure, self.job_name, self.nproc, 
+                                U_strategy_instance = self.U_strategy, 
+                                supplementary_incar_dict = self.supplementary_incar_dict)
+
+        elif self.job_type == 'DOS':
+            previous_vasp_dir = fw_spec['previous_launch_dir']
+            self.get_MaterialsProject_DOS_VASP_inputs(self.structure, previous_vasp_dir, 
+                                    self.nproc, kpoints_density=1000, 
+                                    U_strategy_instance = self.U_strategy,
+                                    supplementary_incar_dict = self.supplementary_incar_dict)
+
+        # execute the BASH script. os.system should wait for the child process to end.
         os.system('bash job.sh')           
 
+        # push an analysis job in the launchpad!
+        new_fw = Firework(MyAnalysisFireTask(), fw_spec)
+
+        return FWAction(additions=new_fw)
 
 
     def _load_params(self, d):
@@ -102,7 +122,10 @@ class MyVaspFireTask(FireTaskBase):
         # It appears the structure gets serialized into a dictionary by the action of writing
         # the specs. Let's give it life again!
         self.structure = Structure.from_dict(d['structure'])
+
         self.job_name = d['job_name']
+        self.job_type = d['job_type']
+        self.version  = d['version']
 
         if 'nproc' in d:
             self.nproc = int(d['nproc'])
@@ -124,7 +147,8 @@ class MyVaspFireTask(FireTaskBase):
             self.U_strategy = None
         
 
-    def generate_VASP_inputs(self, structure, job_name, nproc=16, U_strategy_instance = None, supplementary_incar_dict = None):
+    def generate_VASP_inputs(self, structure, job_name, nproc=16, U_strategy_instance = None, 
+                                                            supplementary_incar_dict = None):
         """
         Inputs will be inspired by MaterialsProject, but this function is appropriate
         when we are seriously modifying the inputs such that they no longer conform to Materials Project.
@@ -185,3 +209,215 @@ class MyVaspFireTask(FireTaskBase):
             f.write(clean_template)
 
         return 0
+
+
+    def get_MaterialsProject_DOS_VASP_inputs(self, structure, previous_vasp_dir, 
+                                    nproc=16, kpoints_density=1000, U_strategy_instance = None, 
+                                    supplementary_incar_dict=None):
+
+
+        input_set = TetrahedronDosSet.from_previous_vasp_run(previous_vasp_dir,
+                    kpoints_density=kpoints_density, user_incar_settings=supplementary_incar_dict)
+
+
+        if U_strategy_instance != None:
+            #  reading the structure here insures consistency, rather
+            #  than having the strategy read the structure outside this driver.
+            U_strategy_instance.read_structure(structure)
+
+            # Generate all LDAU-related variables according to specified strategy.
+            LDAU_dict, poscar_need_hack, potcar_need_hack = U_strategy_instance.get_LDAU()
+
+            incar.update(LDAU_dict) 
+
+        # set the number of parallel processors to sqrt(nproc), 
+        # as recommended in manual.
+        incar.update({'NPAR':int(np.sqrt(nproc))}) 
+
+        if supplementary_incar_dict != None:
+            incar.update(supplementary_incar_dict) 
+
+        poscar = input_set.get_poscar(structure)
+        kpoints = input_set.get_kpoints(structure)
+        potcar = input_set.get_potcar(structure)
+
+        incar.write_file('INCAR')
+        poscar.write_file('POSCAR', vasp4_compatible = True)
+        kpoints.write_file('KPOINTS')
+        potcar.write_file('POTCAR')
+
+        if poscar_need_hack:
+            # do we need specialized hacking of the poscar because of the U strategy?       
+            # For instance, if two Transition Metal sites with the same element 
+            # must be treated as independent, Pymatgen is not capable of doing this
+            # and we must HACK.
+            new_poscar_lines = U_strategy_instance.get_new_poscar_lines()
+            with open('POSCAR','w') as f:
+                for line in new_poscar_lines:
+                    print >>f, line.strip()
+
+        if potcar_need_hack:
+            # do we need specialized hacking of the potcar because of the U strategy?       
+            new_potcar_symbols = U_strategy_instance.get_new_potcar_symbols(potcar)
+            new_potcar = Potcar(new_potcar_symbols) 
+            # overwrite the previous potcar
+            new_potcar.write_file('POTCAR')
+
+        with open('job.sh','w') as f:
+            f.write(job_template)
+
+        with open('clean.sh','w') as f:
+            f.write(clean_template)
+
+        return 0
+
+
+
+class MyAnalysisFireTask(FireTaskBase):
+    """
+    This task will read the VASP output, compute various metrics and decide what to do next.
+    """
+
+    _fw_name = 'MyAnalysisFireTask'
+
+    def run_task(self, fw_spec):
+        self.job_name = fw_spec['job_name']
+        self.job_type = fw_spec['job_type']
+        self.version  = fw_spec['version']
+
+        # read the vasprun.xml and OUTCAR file,         
+        # outputing the highlights to run_data.json
+        extract_json_data()
+
+        # get the structure that was written, and read it in
+        structure, max_force = self.extract_run_data_info()
+
+        # write a cif for posterity
+        self.write_structure(structure)
+
+        # Decide what to do next!
+        need_new_job = self.update_specs(structure, max_force, fw_specs)
+
+        if need_new_job:
+            # push a new VASP job in the launchpad!
+            new_fw = Firework(MyVaspFireTask(), fw_spec)
+            return FWAction(additions=new_fw)
+        else:
+            # we are done!                
+            return FWAction()
+
+
+    def update_specs(self,structure, max_force, fw_specs):
+
+        fw_specs['structure'] = structure 
+        fw_specs['previous_launch_dir'] = fw_specs['_launch_dir']
+
+        formula  = self.structure.formula.replace(' ','')
+
+        if self.job_type == 'relax': 
+
+            if max_force < 0.05 or self.version > 5: 
+                # relaxations are done, or it is hopless to reduce forces! Let's do a ground state!                    
+                fw_spec['job_type'] = 'ground_state'
+                fw_spec['job_name'] = formula+'_ground_state_V%i'%(self.version)  
+                fw_spec['_launch_dir'] = fw_spec['top_dir']+'/ground_state_V%i/'%(self.version)  
+
+                GS_dict  = dict(    EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
+                                    PREC    =   'HIGH',     # level of precision
+                                    NSW     =     0,        # no ionic steps: fixed ions
+                                    ICHARG  =     1,        # read in the CHGCAR file
+                                    LORBIT  =   11,         # 11 prints out the DOS
+                                    LCHARG  =   True,       # Write charge densities?
+                                    LWAVE   =   False,      # write out the wavefunctions?
+                                    NELM    =   100)        # maximum number of SCF cycles 
+
+                fw_spec['supplementary_incar_dict'].update(GS_dict) 
+                need_new_job = True
+
+            else:
+                #  we must relax some more
+                fw_spec['job_type'] = 'relax'
+                self.version += 1
+                fw_spec['version'] = self.version
+                fw_spec['job_name'] = formula+'_relax_V%i'%(self.version)  
+                fw_spec['_launch_dir'] = fw_spec['top_dir']+'/relax_V%i/'%(self.version)  
+
+                # no need to work too hard; forces are large, convergence
+                # need not be stringent
+                if max_force > 0.3:
+                    relax_dict = dict(    LCHARG  =   False,      # Write charge densities?
+                                          EDIFF   =   1E-3,       # criterion to stop SCF loop, in eV
+                                          EDIFFG  =  -2E-1,       # criterion to stop ionic relaxations. Negative means FORCES < |EDIFFG|
+                                          NELM    =    10,        # maximum number of SCF cycles 
+                                          ICHARG  =     1,        # read in the CHGCAR file
+                                          IBRION  =     2,        # use the robust CG algorithm
+                                          ISIF    =     0,        # Don't relax cell shape 
+                                          NSW     =     20)       # max number of ionic steps: if it takes more, something is wrong.
+                else:
+                    relax_dict = dict(    LCHARG  =   False,      # Write charge densities?
+                                          EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
+                                          EDIFFG  =  -5E-2,       # criterion to stop ionic relaxations. Negative means FORCES < |EDIFFG|
+                                          NELM    =    20,        # maximum number of SCF cycles 
+                                          ICHARG  =     1,        # read in the CHGCAR file
+                                          IBRION  =     1,        # use the RMM-DIIS algorithm
+                                          ISIF    =     3,        # Do relax cell shape 
+                                          NSW     =     30)       # max number of ionic steps: if it takes more, something is wrong.
+
+                fw_spec['supplementary_incar_dict'].update(relax_dict) 
+                need_new_job = True
+
+        if self.job_type == 'ground_state': 
+            # let's do the DOS next!
+            fw_spec['job_type'] = 'DOS'
+            fw_spec['job_name'] = formula+'_DOS_V%i'%(self.version)  
+            fw_spec['_launch_dir'] = fw_spec['top_dir']+'/DOS_V%i/'%(self.version)  
+
+
+            DOS_dict = dict(    EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
+                                PREC    =   'HIGH',     # level of precision
+                                NSW     =   0,          # no ionic steps: fixed ions
+                                LORBIT  =   11,         # 11 prints out the DOS
+                                LCHARG  =   False,      # Write charge densities?
+                                LWAVE   =   False,      # write out the wavefunctions?
+                                NELM    =   100,        # maximum number of SCF cycles 
+                                ISMEAR  =    -5,        # tetrahedron integration
+                                EMIN    =   -10,        # minimum energy for DOS
+                                EMAX    =    10,        # maximum energy for DOS
+                                NEDOS   =   2000)       # how many points for DOS calculation
+
+            fw_spec['supplementary_incar_dict'].update(DOS_dict) 
+            need_new_job = True
+
+
+        if self.job_type == 'DOS': 
+            # we are done!
+            need_new_job = False
+
+        return need_new_job 
+
+    def extract_run_data_info(self):
+        """ read the json file and extract the structure """
+        json_data_filename =  relax_dir+'run_data.json'
+        file = open(json_data_filename ,'r')
+        data_dictionary = json.load(file)
+        file.close()
+
+        last_step = data_dictionary['relaxation'][-1]
+        structure_dict = last_step['structure']
+
+        # we finally get the relaxed structure
+        structure = Structure.from_dict(structure_dict)
+        max_force = np.sqrt(np.sum(np.array(last_step['forces'])**2,axis=1)).max() 
+
+        return structure, max_force 
+
+
+    def write_structure(self,structure):
+
+        formula  = structure.formula.replace(' ','')+'_%s_V%i'%(self.job_type,self.version)
+
+        cif_filename = formula+'.cif'
+
+        structure.to(fmt='cif',filename=cif_filename)
+
+
