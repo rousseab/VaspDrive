@@ -159,6 +159,10 @@ class MyVaspFireTask(FireTaskBase):
        
         incar  = input_set.get_incar(structure)
 
+
+        poscar_need_hack = False
+        potcar_need_hack = False
+
         if U_strategy_instance != None:
             #  reading the structure here insures consistency, rather
             #  than having the strategy read the structure outside this driver.
