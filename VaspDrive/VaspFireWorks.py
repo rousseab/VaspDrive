@@ -115,7 +115,7 @@ class MyVaspFireTask(FireTaskBase):
             except:
                 print('CHGCAR could not be moved to working directory')
 
-            check = self.generate_VASP_inputs(self.structure, self.job_name, self.nproc, 
+            check = self.generate_VASP_inputs(self.structure, self.name, self.nproc, 
                                 U_strategy_instance = self.U_strategy, 
                                 supplementary_incar_dict = self.supplementary_incar_dict)
 
@@ -150,7 +150,7 @@ class MyVaspFireTask(FireTaskBase):
         # the specs. Let's give it life again!
         self.structure = Structure.from_dict(d['structure'])
 
-        self.job_name = d['job_name']
+        self.name = d['name']
         self.job_type = d['job_type']
         self.version  = d['version']
 
@@ -174,7 +174,7 @@ class MyVaspFireTask(FireTaskBase):
             self.U_strategy = None
         
 
-    def generate_VASP_inputs(self, structure, job_name, nproc=16, U_strategy_instance = None, 
+    def generate_VASP_inputs(self, structure, name, nproc=16, U_strategy_instance = None, 
                                                             supplementary_incar_dict = None):
         """
         Inputs will be inspired by MaterialsProject, but this function is appropriate
@@ -314,7 +314,7 @@ class MyAnalysisFireTask(FireTaskBase):
     _fw_name = 'MyAnalysisFireTask'
 
     def run_task(self, fw_spec):
-        self.job_name = fw_spec['job_name']
+        self.name = fw_spec['name']
         self.job_type = fw_spec['job_type']
         self.version  = fw_spec['version']
 
@@ -345,7 +345,7 @@ class MyAnalysisFireTask(FireTaskBase):
             if max_force < 0.05 or self.version > 8: 
                 # relaxations are done, or it is hopless to reduce forces! Let's do a ground state!                    
                 fw_spec['job_type'] = 'ground_state'
-                fw_spec['job_name'] = formula+'_ground_state_V%i'%(self.version)  
+                fw_spec['name'] = formula+'_ground_state_V%i'%(self.version)  
                 fw_spec['_launch_dir'] = fw_spec['top_dir']+'/ground_state_V%i/'%(self.version)  
                 fw_spec['ground_state_dir'] = fw_spec['_launch_dir']  # for other post-processing to know where to get densities
 
@@ -370,7 +370,7 @@ class MyAnalysisFireTask(FireTaskBase):
                 fw_spec['job_type'] = 'relax'
                 self.version += 1
                 fw_spec['version'] = self.version
-                fw_spec['job_name'] = formula+'_relax_V%i'%(self.version)  
+                fw_spec['name'] = formula+'_relax_V%i'%(self.version)  
                 fw_spec['_launch_dir'] = fw_spec['top_dir']+'/relax_V%i/'%(self.version)  
 
 
@@ -415,7 +415,7 @@ class MyAnalysisFireTask(FireTaskBase):
             fw_spec_DOS = deepcopy(fw_spec)
             
             fw_spec_DOS['job_type'] = 'DOS'
-            fw_spec_DOS['job_name'] = formula+'_DOS_V%i'%(self.version)  
+            fw_spec_DOS['name'] = formula+'_DOS_V%i'%(self.version)  
             fw_spec_DOS['_launch_dir'] = fw_spec['top_dir']+'/DOS_V%i/'%(self.version)  
 
 
@@ -437,7 +437,7 @@ class MyAnalysisFireTask(FireTaskBase):
 
             fw_spec_BADER = deepcopy(fw_spec)
             fw_spec_BADER['job_type'] = 'Bader'
-            fw_spec_BADER['job_name'] = formula+'_Bader_V%i'%(self.version)  
+            fw_spec_BADER['name'] = formula+'_Bader_V%i'%(self.version)  
             fw_spec_BADER['_launch_dir'] = fw_spec['top_dir']+'/Bader_V%i/'%(self.version)  
 
             new_BADER_fw = Firework(MyBaderFireTask(), fw_spec_BADER)
@@ -473,7 +473,6 @@ class MyAnalysisFireTask(FireTaskBase):
         cif_filename = formula+'.cif'
 
         structure.to(fmt='cif',filename=cif_filename)
-
 
 
 
