@@ -186,7 +186,6 @@ class MyVaspFireTask(FireTaskBase):
        
         incar  = input_set.get_incar(structure)
 
-
         poscar_need_hack = False
         potcar_need_hack = False
 
@@ -247,10 +246,11 @@ class MyVaspFireTask(FireTaskBase):
                                     supplementary_incar_dict=None):
 
 
-        input_set = TetrahedronDosSet.from_previous_vasp_run(previous_vasp_dir,
-                    kpoints_density=kpoints_density, user_incar_settings=supplementary_incar_dict)
+        if supplementary_incar_dict != None:
+            user_incar_dict = deepcopy(supplementary_incar_dict)
+        else:
+            user_incar_dict = {}
 
-        incar = input_set.get_incar(structure)
 
         poscar_need_hack = False
         potcar_need_hack = False
@@ -262,23 +262,14 @@ class MyVaspFireTask(FireTaskBase):
             # Generate all LDAU-related variables according to specified strategy.
             LDAU_dict, poscar_need_hack, potcar_need_hack = U_strategy_instance.get_LDAU()
 
-            incar.update(LDAU_dict) 
+            user_incar_dict.update(LDAU_dict) 
 
         # set the number of parallel processors to sqrt(nproc), 
         # as recommended in manual.
-        incar.update({'NPAR':int(np.sqrt(nproc))}) 
+        user_incar_dict.update({'NPAR':int(np.sqrt(nproc))}) 
 
-        if supplementary_incar_dict != None:
-            incar.update(supplementary_incar_dict) 
-
-        poscar = input_set.get_poscar(structure)
-        kpoints = input_set.get_kpoints(structure)
-        potcar = input_set.get_potcar(structure)
-
-        incar.write_file('INCAR')
-        poscar.write_file('POSCAR', vasp4_compatible = True)
-        kpoints.write_file('KPOINTS')
-        potcar.write_file('POTCAR')
+        input_set = TetrahedronDosSet.from_previous_vasp_run(previous_vasp_dir,
+                    kpoints_density=kpoints_density, user_incar_settings=user_incar_dict)
 
         if poscar_need_hack:
             # do we need specialized hacking of the poscar because of the U strategy?       
