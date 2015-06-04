@@ -87,18 +87,26 @@ class MyVaspFireTask(FireTaskBase):
 
         self._load_params(fw_spec)
 
-
         if 'previous_launch_dir' in fw_spec:
             src = fw_spec['previous_launch_dir']+'/CHGCAR'
             dst = launch_dir+'/CHGCAR'
-            shutil.move(src, dst)            
 
         if self.job_type == 'relax' or self.job_type == 'ground_state':
+            try:
+                shutil.move(src, dst)            
+            except:
+                print('CHGCAR could not be moved to working directory')
+
             check = self.generate_VASP_inputs(self.structure, self.job_name, self.nproc, 
                                 U_strategy_instance = self.U_strategy, 
                                 supplementary_incar_dict = self.supplementary_incar_dict)
 
         elif self.job_type == 'DOS':
+            try:
+                shutil.copy(src, dst)            
+            except:
+                print('CHGCAR could not be COPIED to working directory')
+
             previous_vasp_dir = fw_spec['previous_launch_dir']
             self.get_MaterialsProject_DOS_VASP_inputs(self.structure, previous_vasp_dir, 
                                     self.nproc, kpoints_density=1000, 
@@ -322,7 +330,7 @@ class MyAnalysisFireTask(FireTaskBase):
 
         if self.job_type == 'relax': 
 
-            if max_force < 0.05 or self.version > 5: 
+            if max_force < 0.05 or self.version > 8: 
                 # relaxations are done, or it is hopless to reduce forces! Let's do a ground state!                    
                 fw_spec['job_type'] = 'ground_state'
                 fw_spec['job_name'] = formula+'_ground_state_V%i'%(self.version)  
