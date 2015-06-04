@@ -250,6 +250,8 @@ class MyVaspFireTask(FireTaskBase):
         input_set = TetrahedronDosSet.from_previous_vasp_run(previous_vasp_dir,
                     kpoints_density=kpoints_density, user_incar_settings=supplementary_incar_dict)
 
+        incar = input_set.get_incar(structure)
+
         poscar_need_hack = False
         potcar_need_hack = False
         if U_strategy_instance != None:
@@ -483,8 +485,6 @@ class MyAnalysisFireTask(FireTaskBase):
 
         structure.to(fmt='cif',filename=cif_filename)
 
-
-
 class MyBaderFireTask(FireTaskBase):
     """
     This task will move the AECAR files from the GS directory and compute the BADER charges.
@@ -502,6 +502,10 @@ class MyBaderFireTask(FireTaskBase):
             src = gs_dir+'/'+filename
             dst = launch_dir+'/'+filename
             shutil.move(src,dst)
+
+        src = gs_dir+'/CHGCAR'
+        dst = launch_dir+'/CHGCAR'
+        shutil.copy(src,dst)
 
         with open('bader_job.sh','w') as f:
             f.write(BADER_job_template)
