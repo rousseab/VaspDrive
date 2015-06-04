@@ -90,7 +90,6 @@ class MyTestTask(FireTaskBase):
 
         return number
 
-
 class MyVaspFireTask(FireTaskBase):
     """
     This task will write/hack the VASP inputs, so that they are ready to 
@@ -296,7 +295,6 @@ class MyVaspFireTask(FireTaskBase):
 
         return 0
 
-
 class MyAnalysisFireTask(FireTaskBase):
     """
     This task will read the VASP output, compute various metrics and decide what to do next.
@@ -422,7 +420,9 @@ class MyAnalysisFireTask(FireTaskBase):
                                 PREC    =   'ACCURATE', # level of precision
                                 NSW     =   0,          # no ionic steps: fixed ions
                                 LORBIT  =   11,         # 11 prints out the DOS
+                                ADDGRID =  False,       # only necessary in ground state
                                 LCHARG  =   False,      # Write charge densities?
+                                LAECHG =    False,      # don't need all electron densities
                                 LWAVE   =   False,      # write out the wavefunctions?
                                 NELM    =   100,        # maximum number of SCF cycles 
                                 ISMEAR  =    -5,        # tetrahedron integration
