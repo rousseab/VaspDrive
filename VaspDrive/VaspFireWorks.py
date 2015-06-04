@@ -4,6 +4,7 @@
 import os
 import shutil
 import json
+from copy import deepcopy
 from fireworks.user_objects.firetasks.script_task import ScriptTask
 from fireworks import Firework
 
@@ -20,7 +21,6 @@ import os
 import sys
 
 job_template = """#!/bin/bash
-
 module purge
 module add intel/2013u0
 module add openmpi/1.6.3
@@ -34,6 +34,24 @@ unset SGE_ROOT
 
 time mpiexec -np $NBCORE -x LD_LIBRARY_PATH -machinefile machines $VASP &> output.txt
 """
+
+BADER_job_template = """
+module purge
+module add intel/2013u0
+module add openmpi/1.6.3
+
+source ~/.bash_profile
+source /gpfsFS1/scratch/nobackup/projets/gc029/xw2738/BASH/create_machinefile.sh
+create_machinefile
+unset SGE_ROOT
+
+CHGSUM=/gpfsFS1/scratch/nobackup/projets/gc029/xw2738/TOOLS/PERL/chgsum.pl
+BADER=/gpfsFS1/scratch/nobackup/projets/gc029/xw2738/depository/bader/bader
+
+$CHGSUM AECCAR0 AECCAR2
+$BADER CHGCAR -ref CHGCAR_sum
+"""
+
 
 class MyTestTask(FireTaskBase):
     """ Simple test task to play with Fireworks' various functionalities.
@@ -287,6 +305,7 @@ class MyVaspFireTask(FireTaskBase):
 
 
 
+
 class MyAnalysisFireTask(FireTaskBase):
     """
     This task will read the VASP output, compute various metrics and decide what to do next.
@@ -310,18 +329,11 @@ class MyAnalysisFireTask(FireTaskBase):
         self.write_structure(structure)
 
         # Decide what to do next!
-        need_new_job = self.update_specs(structure, max_force, fw_spec)
+        firework_action = self.update_spec_and_launch_fireworks(structure, max_force, fw_spec)
 
-        if need_new_job:
-            # push a new VASP job in the launchpad!
-            new_fw = Firework(MyVaspFireTask(), fw_spec)
-            return FWAction(additions=new_fw)
-        else:
-            # we are done!                
-            return FWAction()
+        return firework_action 
 
-
-    def update_specs(self,structure, max_force, fw_spec):
+    def update_spec_and_launch_fireworks(self,structure, max_force, fw_spec):
 
         fw_spec['structure'] = structure 
         fw_spec['previous_launch_dir'] = fw_spec['_launch_dir']
@@ -335,18 +347,23 @@ class MyAnalysisFireTask(FireTaskBase):
                 fw_spec['job_type'] = 'ground_state'
                 fw_spec['job_name'] = formula+'_ground_state_V%i'%(self.version)  
                 fw_spec['_launch_dir'] = fw_spec['top_dir']+'/ground_state_V%i/'%(self.version)  
+                fw_spec['ground_state_dir'] = fw_spec['_launch_dir']  # for other post-processing to know where to get densities
 
                 GS_dict  = dict(    EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
-                                    PREC    =   'HIGH',     # level of precision
+                                    PREC    =   'ACCURATE', # level of precision
                                     NSW     =     0,        # no ionic steps: fixed ions
                                     ICHARG  =     1,        # read in the CHGCAR file
                                     LORBIT  =   11,         # 11 prints out the DOS
                                     LCHARG  =   True,       # Write charge densities?
                                     LWAVE   =   False,      # write out the wavefunctions?
-                                    NELM    =   100)        # maximum number of SCF cycles 
+                                    NELM    =   100,        # maximum number of SCF cycles 
+                                    ADDGRID =   True,       # fine FFT grid; not sure if this is needed for bader?
+                                    LAECHG  =   True)       # Compute and write CORE electronic density, for BADER
 
                 fw_spec['supplementary_incar_dict'].update(GS_dict) 
-                need_new_job = True
+                new_fw = Firework(MyVaspFireTask(), fw_spec)
+
+                return FWAction(additions=new_fw)
 
             else:
                 #  we must relax some more
@@ -356,39 +373,54 @@ class MyAnalysisFireTask(FireTaskBase):
                 fw_spec['job_name'] = formula+'_relax_V%i'%(self.version)  
                 fw_spec['_launch_dir'] = fw_spec['top_dir']+'/relax_V%i/'%(self.version)  
 
+
+                if self.version > 4:
+                    # relaxation is in distress!
+                    potim = 0.2
+                else:
+                    # default value
+                    potim = 0.5
                 # no need to work too hard; forces are large, convergence
                 # need not be stringent
                 if max_force > 0.3:
-                    relax_dict = dict(    LCHARG  =   False,      # Write charge densities?
+                    relax_dict = dict(    LCHARG  =   True,       # Write charge densities?
+                                          PREC    =   'NORMAL',   # level of precision
                                           EDIFF   =   1E-3,       # criterion to stop SCF loop, in eV
                                           EDIFFG  =  -2E-1,       # criterion to stop ionic relaxations. Negative means FORCES < |EDIFFG|
                                           NELM    =    10,        # maximum number of SCF cycles 
                                           ICHARG  =     1,        # read in the CHGCAR file
                                           IBRION  =     2,        # use the robust CG algorithm
                                           ISIF    =     0,        # Don't relax cell shape 
+                                          POTIM   =   potim,      # controls step in relaxation algorithm
                                           NSW     =     20)       # max number of ionic steps: if it takes more, something is wrong.
                 else:
-                    relax_dict = dict(    LCHARG  =   False,      # Write charge densities?
+                    relax_dict = dict(    LCHARG  =   True,       # Write charge densities?
+                                          PREC    =   'ACCURATE', # level of precision
                                           EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
                                           EDIFFG  =  -5E-2,       # criterion to stop ionic relaxations. Negative means FORCES < |EDIFFG|
                                           NELM    =    20,        # maximum number of SCF cycles 
                                           ICHARG  =     1,        # read in the CHGCAR file
                                           IBRION  =     1,        # use the RMM-DIIS algorithm
                                           ISIF    =     3,        # Do relax cell shape 
+                                          POTIM   =   potim,      # controls step in relaxation algorithm
                                           NSW     =     30)       # max number of ionic steps: if it takes more, something is wrong.
 
                 fw_spec['supplementary_incar_dict'].update(relax_dict) 
-                need_new_job = True
+                new_fw = Firework(MyVaspFireTask(), fw_spec)
+                return FWAction(additions=new_fw)
 
         if self.job_type == 'ground_state': 
-            # let's do the DOS next!
-            fw_spec['job_type'] = 'DOS'
-            fw_spec['job_name'] = formula+'_DOS_V%i'%(self.version)  
-            fw_spec['_launch_dir'] = fw_spec['top_dir']+'/DOS_V%i/'%(self.version)  
+            # let's do the DOS and BADER next!
+
+            fw_spec_DOS = deepcopy(fw_spec)
+            
+            fw_spec_DOS['job_type'] = 'DOS'
+            fw_spec_DOS['job_name'] = formula+'_DOS_V%i'%(self.version)  
+            fw_spec_DOS['_launch_dir'] = fw_spec['top_dir']+'/DOS_V%i/'%(self.version)  
 
 
             DOS_dict = dict(    EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
-                                PREC    =   'HIGH',     # level of precision
+                                PREC    =   'ACCURATE', # level of precision
                                 NSW     =   0,          # no ionic steps: fixed ions
                                 LORBIT  =   11,         # 11 prints out the DOS
                                 LCHARG  =   False,      # Write charge densities?
@@ -399,15 +431,23 @@ class MyAnalysisFireTask(FireTaskBase):
                                 EMAX    =    10,        # maximum energy for DOS
                                 NEDOS   =   2000)       # how many points for DOS calculation
 
-            fw_spec['supplementary_incar_dict'].update(DOS_dict) 
-            need_new_job = True
+            fw_spec_DOS['supplementary_incar_dict'].update(DOS_dict) 
 
+            new_DOS_fw = Firework(MyVaspFireTask(), fw_spec_DOS)
 
-        if self.job_type == 'DOS': 
+            fw_spec_BADER = deepcopy(fw_spec)
+            fw_spec_BADER['job_type'] = 'Bader'
+            fw_spec_BADER['job_name'] = formula+'_Bader_V%i'%(self.version)  
+            fw_spec_BADER['_launch_dir'] = fw_spec['top_dir']+'/Bader_V%i/'%(self.version)  
+
+            new_BADER_fw = Firework(MyBaderFireTask(), fw_spec_BADER)
+
+            return FWAction(additions = [new_DOS_fw,new_BADER_fw] )
+
+        if self.job_type == 'DOS' or self.job_type == 'Bader': 
             # we are done!
-            need_new_job = False
+            return FWAction()
 
-        return need_new_job 
 
     def extract_run_data_info(self):
         """ read the json file and extract the structure """
@@ -435,3 +475,30 @@ class MyAnalysisFireTask(FireTaskBase):
         structure.to(fmt='cif',filename=cif_filename)
 
 
+
+
+class MyBaderFireTask(FireTaskBase):
+    """
+    This task will move the AECAR files from the GS directory and compute the BADER charges.
+    """
+
+    _fw_name = 'MyBaderFireTask'
+
+    def run_task(self, fw_spec):
+
+        launch_dir = fw_spec['_launch_dir']
+        gs_dir = fw_spec['ground_state_dir']
+
+        # move the large density files to the workding directory
+        for filename in ['AECCAR0','AECCAR2']:
+            src = gs_dir+'/'+filename
+            dst = launch_dir+'/'+filename
+            shutil.move(src,dst)
+
+        with open('bader_job.sh','w') as f:
+            f.write(BADER_job_template)
+
+        os.system('bash bader_job.sh')           
+
+        # end of the line
+        return FWAction()
