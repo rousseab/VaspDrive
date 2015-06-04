@@ -304,8 +304,6 @@ class MyVaspFireTask(FireTaskBase):
         return 0
 
 
-
-
 class MyAnalysisFireTask(FireTaskBase):
     """
     This task will read the VASP output, compute various metrics and decide what to do next.
@@ -360,7 +358,11 @@ class MyAnalysisFireTask(FireTaskBase):
                                     ADDGRID =   True,       # fine FFT grid; not sure if this is needed for bader?
                                     LAECHG  =   True)       # Compute and write CORE electronic density, for BADER
 
-                fw_spec['supplementary_incar_dict'].update(GS_dict) 
+                if 'supplementary_incar_dict' in fw_spec:
+                    fw_spec['supplementary_incar_dict'].update(GS_dict) 
+                else:
+                    fw_spec['supplementary_incar_dict'] = GS_dict 
+
                 new_fw = Firework(MyVaspFireTask(), fw_spec)
 
                 return FWAction(additions=new_fw)
@@ -405,7 +407,11 @@ class MyAnalysisFireTask(FireTaskBase):
                                           POTIM   =   potim,      # controls step in relaxation algorithm
                                           NSW     =     30)       # max number of ionic steps: if it takes more, something is wrong.
 
-                fw_spec['supplementary_incar_dict'].update(relax_dict) 
+                if 'supplementary_incar_dict' in fw_spec:
+                    fw_spec['supplementary_incar_dict'].update(relax_dict) 
+                else:
+                    fw_spec['supplementary_incar_dict'] = relax_dict
+
                 new_fw = Firework(MyVaspFireTask(), fw_spec)
                 return FWAction(additions=new_fw)
 
@@ -431,7 +437,10 @@ class MyAnalysisFireTask(FireTaskBase):
                                 EMAX    =    10,        # maximum energy for DOS
                                 NEDOS   =   2000)       # how many points for DOS calculation
 
-            fw_spec_DOS['supplementary_incar_dict'].update(DOS_dict) 
+            if 'supplementary_incar_dict' in fw_spec_DOS:
+                fw_spec_DOS['supplementary_incar_dict'].update(DOS_dict) 
+            else:
+                fw_spec_DOS['supplementary_incar_dict'] = DOS_dict
 
             new_DOS_fw = Firework(MyVaspFireTask(), fw_spec_DOS)
 
