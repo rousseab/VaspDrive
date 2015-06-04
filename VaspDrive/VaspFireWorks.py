@@ -318,7 +318,7 @@ class MyAnalysisFireTask(FireTaskBase):
         fw_spec['structure'] = structure 
         fw_spec['previous_launch_dir'] = fw_spec['_launch_dir']
 
-        formula  = self.structure.formula.replace(' ','')
+        formula  = structure.formula.replace(' ','')
 
         if self.job_type == 'relax': 
 
