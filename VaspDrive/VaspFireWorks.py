@@ -3,6 +3,7 @@
 """
 import os
 import shutil
+import json
 from fireworks.user_objects.firetasks.script_task import ScriptTask
 from fireworks import Firework
 
@@ -301,7 +302,7 @@ class MyAnalysisFireTask(FireTaskBase):
         self.write_structure(structure)
 
         # Decide what to do next!
-        need_new_job = self.update_specs(structure, max_force, fw_specs)
+        need_new_job = self.update_specs(structure, max_force, fw_spec)
 
         if need_new_job:
             # push a new VASP job in the launchpad!
@@ -312,10 +313,10 @@ class MyAnalysisFireTask(FireTaskBase):
             return FWAction()
 
 
-    def update_specs(self,structure, max_force, fw_specs):
+    def update_specs(self,structure, max_force, fw_spec):
 
-        fw_specs['structure'] = structure 
-        fw_specs['previous_launch_dir'] = fw_specs['_launch_dir']
+        fw_spec['structure'] = structure 
+        fw_spec['previous_launch_dir'] = fw_spec['_launch_dir']
 
         formula  = self.structure.formula.replace(' ','')
 
@@ -402,7 +403,7 @@ class MyAnalysisFireTask(FireTaskBase):
 
     def extract_run_data_info(self):
         """ read the json file and extract the structure """
-        json_data_filename =  relax_dir+'run_data.json'
+        json_data_filename =  'run_data.json'
         file = open(json_data_filename ,'r')
         data_dictionary = json.load(file)
         file.close()
