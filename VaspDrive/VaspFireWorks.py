@@ -415,7 +415,8 @@ class MyAnalysisFireTask(FireTaskBase):
             fw_spec_DOS['name'] = formula+'_DOS_V%i'%(self.version)  
             fw_spec_DOS['_launch_dir'] = fw_spec['top_dir']+'/DOS_V%i/'%(self.version)  
 
-
+            # Careful! This dict is added to variables already present because of Pymatgen,
+            # and there is a consistency check
             DOS_dict = dict(    EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
                                 PREC    =   'ACCURATE', # level of precision
                                 NSW     =   0,          # no ionic steps: fixed ions
@@ -425,6 +426,8 @@ class MyAnalysisFireTask(FireTaskBase):
                                 LAECHG =    False,      # don't need all electron densities
                                 LWAVE   =   False,      # write out the wavefunctions?
                                 NELM    =   100,        # maximum number of SCF cycles 
+                                ICHARG  =    11,        # non-scf density
+                                IBRION  =    -1,        # don't move structure
                                 ISMEAR  =    -5,        # tetrahedron integration
                                 EMIN    =   -10,        # minimum energy for DOS
                                 EMAX    =    10,        # maximum energy for DOS
