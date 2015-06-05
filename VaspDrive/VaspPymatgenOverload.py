@@ -163,12 +163,13 @@ class TetrahedronDosSet(MPNonSCFVaspInputSet):
 
         #Overwrite necessary INCAR parameters from previous runs
         #  this is already done in the __init__; is it necessary here?
+        previous_incar.update(nscf_incar_settings)
+        previous_incar.update(user_incar_settings)
+
+        # MAKE EXTRA DUPER SURE THESE PARAMETERS ARE NOT OVERWRITTEN
         previous_incar.update({"IBRION": -1, "ISMEAR": -5, 
                                "LCHARG": False, "LORBIT": 11, "LWAVE": False,
                                "NSW": 0, "ISYM": 0, "ICHARG": 11})
-
-        previous_incar.update(nscf_incar_settings)
-        previous_incar.update(user_incar_settings)
 
         previous_incar.pop("MAGMOM", None)
         previous_incar.pop('SIGMA',None) 
