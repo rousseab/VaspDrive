@@ -105,6 +105,8 @@ def extract_json_data():
             entry = queen.get_data()[0]
 
             dictionary_data['ComputedEntry'] =  entry.as_dict()
+        except:
+            print('ComputedEntry COULD NOT BE EXTRACTED BY PYMATGEN...')
 
 
         try:
