@@ -5,6 +5,7 @@ import pymatgen
 import os
 import time
 import shutil
+import json
 
 from pymatgen.apps.borg.hive import VaspToComputedEntryDrone
 from pymatgen.apps.borg.queen import BorgQueen
@@ -187,7 +188,7 @@ class RepairJsonData(object):
 
         entry = pymatgen.entries.computed_entries.ComputedEntry(composition, energy, parameters=parameters )
 
-        data['ComputedEntry'] = entry.to_dict()
+        data['ComputedEntry'] = entry
 
         if save_old_file:
             shutil.move('run_data.json','run_data_OLD.json')
