@@ -4,6 +4,7 @@
 import pymatgen
 import os
 import time
+import shutil
 
 from pymatgen.apps.borg.hive import VaspToComputedEntryDrone
 from pymatgen.apps.borg.queen import BorgQueen
@@ -11,6 +12,11 @@ from pymatgen.apps.borg.queen import BorgQueen
 from pymatgen.io.smartio import read_structure, write_structure
 from pymatgen.io.vaspio import Outcar, Vasprun
 from pymatgen.serializers.json_coders import pmg_dump
+
+
+from pymatgen.io.vaspio_set import MPVaspInputSet
+from pymatgen.io.vaspio.vasp_input import Incar, Potcar, Poscar
+from pymatgen.entries.computed_entries import ComputedEntry
 
 import ase.calculators.vasp as ase_vasp
 
@@ -145,4 +151,74 @@ def get_qstat_ids():
     qstat_ids = map( lambda s: int(s.split()[0]), lines[2:])
     return qstat_ids 
 
+class RepairJsonData(object):
+    """ This simple class sets out to repair the run_data.json files
+        which were generated without a ComputedEntry field, followed by 
+        deletion of the vasprun.xml file.
 
+        This class is unlikely to be very useful once I have repaired my 
+        current pool of files, but let's keep it here for posterity.
+    """
+
+    def __init__(self,save_old_file=False):
+
+        # read in what is there
+        json_filename = 'run_data.json'
+
+        try:
+            with open(json_filename,'r') as f:
+                data =json.load(f)
+        except:
+            print("CANNOT FIND run_data.json: CLASS MUST BE CALLED IN DIRECTORY WHERE FILE IS")
+            return
+
+        last_step = data['relaxation'][-1]
+
+        structure = pymatgen.Structure.from_dict(last_step['structure'])
+        composition = structure.composition
+        energy = last_step['electronic']['e_0_energy']
+
+        set = MPVaspInputSet()
+        incar = set.get_incar(structure)
+        poscar = set.get_poscar(structure)
+        potcar = set.get_potcar(structure)
+
+        parameters = self.parse_pseudo_inputs(poscar,incar,potcar)
+
+        entry = pymatgen.entries.computed_entries.ComputedEntry(composition, energy, parameters=parameters )
+
+        data['ComputedEntry'] = entry.to_dict()
+
+        if save_old_file:
+            shutil.move('run_data.json','run_data_OLD.json')
+
+        pmg_dump(data, 'run_data.json')
+
+        return
+
+
+    def parse_pseudo_inputs(self,poscar,incar,potcar):
+        """ 
+        This code is copy-pasted from pymatgen's hive.py routine.
+        It aims to generate run parameters from the known input, even
+        if output was deleted. 
+        """        
+        param = {"hubbards":{}}
+        if (poscar is not None and incar is not None and "LDAUU" in incar):
+            param["hubbards"] = dict(zip(poscar.site_symbols, incar["LDAUU"]))
+
+        param["is_hubbard"] = (
+            incar.get("LDAU", False) and sum(param["hubbards"].values()) > 0
+        ) if incar is not None else False
+        param["run_type"] = None
+
+        if incar is not None:
+            param["run_type"] = "GGA+U" if param["is_hubbard"] else "GGA"
+
+        potcar_symbols = []
+        for p in potcar:
+            potcar_symbols.append(p.header) 
+
+        param["potcar_symbols"] = potcar_symbols
+
+        return param
