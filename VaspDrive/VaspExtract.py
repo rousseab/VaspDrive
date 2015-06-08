@@ -5,6 +5,9 @@ import pymatgen
 import os
 import time
 
+from pymatgen.apps.borg.hive import VaspToComputedEntryDrone
+from pymatgen.apps.borg.queen import BorgQueen
+
 from pymatgen.io.smartio import read_structure, write_structure
 from pymatgen.io.vaspio import Outcar, Vasprun
 from pymatgen.serializers.json_coders import pmg_dump
@@ -92,8 +95,20 @@ def extract_json_data():
     if found_outcar:
         dictionary_data['OUTCAR'] =  o.as_dict()
 
-
     if found_vasprun:
+    
+        try:
+            # try to extract a Computed Entry object, using 
+            # pymatgen technology
+            drone = VaspToComputedEntryDrone()
+            queen = BorgQueen(drone, './', 1)
+            entry = queen.get_data()[0]
+
+            dictionary_data['ComputedEntry'] =  entry.as_dict()
+        except:
+            print('ComputedEntry COULD NOT BE EXTRACTED BY PYMATGEN...')
+
+
         try:
             dictionary_data['DOS'] = vr.complete_dos.as_dict()
             pymatgen_dos_success = True
@@ -115,7 +130,6 @@ def extract_json_data():
             relaxation_data.append(data_dict)
 
         dictionary_data['relaxation'] = relaxation_data 
-
 
 
     if found_outcar or found_vasprun:
