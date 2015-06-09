@@ -144,7 +144,7 @@ class U_Strategy_MaterialsProject(U_Strategy):
         Build MAGMOM, given that some sites must be reduced
         """
 
-        MAGMOM = ''            
+        MAGMOM = []
         ne = number_of_electrons
 
         dict_oxidizable = {}
@@ -163,9 +163,9 @@ class U_Strategy_MaterialsProject(U_Strategy):
 
         for i_s, site in enumerate(self.structure):
             if i_s in dict_oxidizable:
-                MAGMOM += ' %2.1f'%dict_oxidizable[i_s]
+                MAGMOM.append(dict_oxidizable[i_s])
             else:
-                MAGMOM += ' 0.6'
+                MAGMOM.append(0.6)
 
         return MAGMOM 
 
@@ -196,7 +196,6 @@ class U_Strategy_MaterialsProject(U_Strategy):
             poscar_need_hack = True
 
         return LDAU_dict, poscar_need_hack, potcar_need_hack  
-
 
 
 class U_Strategy_HexaCyanoFerrate(U_Strategy):
