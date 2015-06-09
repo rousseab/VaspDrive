@@ -166,6 +166,8 @@ class MyVaspFireTask(FireTaskBase):
         if 'strategy_type' in d:
             if  d['strategy_type'] == 'HexaCyanoFerrate':
                 self.U_strategy = U_Strategy_HexaCyanoFerrate()
+            elif  d['strategy_type'] == 'MaterialsProject':
+                self.U_strategy = U_Strategy_MaterialsProject()
             else:
                 print("UNKNOWN STRATEGY! FAIL HARD")
                 sys.exit()
