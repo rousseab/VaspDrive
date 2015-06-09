@@ -3,7 +3,7 @@
    generate U related information in a way which does not rely
    on the ordering in the CIF file.
 """
-
+import numpy as np
 from copy import deepcopy
 import pymatgen
 from collections import OrderedDict, namedtuple
@@ -163,7 +163,9 @@ class U_Strategy_MaterialsProject(U_Strategy):
 
         for i_s, site in enumerate(self.structure):
             if i_s in dict_oxidizable:
-                MAGMOM.append(dict_oxidizable[i_s])
+                # add a bit of randomness to not get trapped in metastable solution.
+                random_addition = 0.2*np.random.random(1)[0]-0.1
+                MAGMOM.append(dict_oxidizable[i_s]+random_addition)
             else:
                 MAGMOM.append(0.6)
 
