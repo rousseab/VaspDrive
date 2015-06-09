@@ -181,19 +181,13 @@ class U_Strategy_MaterialsProject(U_Strategy):
         Na_indices = self.structure.indices_from_symbol('Na')
         number_of_electrons = len(Na_indices) 
 
-        if number_of_electrons == 0:
-            # structure is fully oxidized, no need to do anything
-            # no need to hack  the poscar or potcar
-            poscar_need_hack = False
-
-        else:
+        if number_of_electrons != 0:
             # structure must be partially reduced; hack MAGMOM
             list_oxidizable_site_indices = self.sort_TM_sites_by_Na_distance(Na_indices)
 
             MAGMOM = self.build_magmom(list_oxidizable_site_indices,number_of_electrons)
             LDAU_dict['MAGMOM'] = MAGMOM 
 
-            poscar_need_hack = True
 
         return LDAU_dict, poscar_need_hack, potcar_need_hack  
 
