@@ -9,6 +9,7 @@ import pymatgen
 from collections import OrderedDict, namedtuple
 from pymatgen.io.vaspio_set import MPVaspInputSet
 from pymatgen.io.vaspio.vasp_input import Poscar, Potcar
+import sys
 
 
 import numpy as np
@@ -76,6 +77,126 @@ class U_Strategy(object):
     def get_new_potcar_symbols(self,old_potcar):
         """ nothing to do!"""
         return
+
+
+class U_Strategy_MaterialsProject(U_Strategy):
+    """
+    Class to create LDAU strings for VASP input, starting from what the MaterialsProject already
+    provides, but with variable starting magnetization on the transition metal sites.
+
+    Who to reduce first? This is a tricky problem, which would be difficult to solve robustly and generally.
+    The following is good enough "right now", but may warrant improvement in the future.
+    """
+    
+    def __init__(self,variable_magnetization_dict={'Fe':[5,4]}):
+        """ 
+
+        input:        
+            variable_magnetization_dict: 
+                                    - key: elements which can have different oxydation states
+                                    - value: magnetization to be put in MAGMOM, most oxidized case first.
+
+        Note: 
+            In a perfect world, we would import a strong AI (or just a better code) which would automatically
+            determine the best starting MAGMOM for a given partially sodiated structure. In this world, however,            
+            I don't have time to design/build/test the perfect solution and some a priori info will have to be passed to this
+            object.
+
+        """
+
+        self.structure_has_been_read = False
+
+        self._LDAU_KEYS = ['LDAUTYPE', 'LDAUPRINT', 'MAGMOM', 'LDAUL', 'LDAUJ', 'LDAUU', 'LDAU'] 
+
+        self.variable_magnetization_dict = variable_magnetization_dict 
+
+
+    def sort_TM_sites_by_Na_distance(self,Na_indices):
+        """
+        Identify the next item to be reduced, with the rules:
+            - reduce Fe-C before Fe-N
+            - reduce Fe nearest Na first
+        """
+
+        list_oxidizable_site_indices = []        
+
+        distance_table = self.structure.distance_matrix[:,Na_indices]
+
+
+        # find all elements in the structure which can be oxidized,
+        # and the minimum distance to a Na atom
+        list_d = []
+        for i_s, site in enumerate(self.structure.sites):
+            if site.specie.symbol in self.variable_magnetization_dict: 
+                dist = np.min(distance_table[i_s])
+
+                list_oxidizable_site_indices.append(i_s)
+                list_d.append(dist) 
+
+        # Sort this list_according to distance
+        I = np.argsort(list_d)
+        list_oxidizable_site_indices = np.array(list_oxidizable_site_indices)[I]
+
+        return list_oxidizable_site_indices 
+  
+    def build_magmom(self,list_oxidizable_site_indices,number_of_electrons):
+        """
+        Build MAGMOM, given that some sites must be reduced
+        """
+
+        MAGMOM = ''            
+        ne = number_of_electrons
+
+        dict_oxidizable = {}
+
+        for i_s in list_oxidizable_site_indices:
+            symbol = self.structure.sites[i_s].specie.symbol
+            if ne > 0:
+                dict_oxidizable[i_s] = self.variable_magnetization_dict[symbol][1]
+                ne -= 1
+            elif ne == 0:
+                dict_oxidizable[i_s] = self.variable_magnetization_dict[symbol][0]
+
+            else:
+                print("SOMETHING IS WRONG. REVIEW CODE!")
+                sys.exit()
+
+        for i_s, site in enumerate(self.structure):
+            if i_s in dict_oxidizable:
+                MAGMOM += ' %2.1f'%dict_oxidizable[i_s]
+            else:
+                MAGMOM += ' 0.6'
+
+        return MAGMOM 
+
+
+
+    def get_LDAU(self):
+        """ Produce LDAU related variables, to be passed to VASP as strings """
+
+        # let's simply use the default as a first step
+
+        LDAU_dict, poscar_need_hack, potcar_need_hack = super(U_Strategy_MaterialsProject, self).get_LDAU()
+
+        Na_indices = self.structure.indices_from_symbol('Na')
+        number_of_electrons = len(Na_indices) 
+
+        if number_of_electrons == 0:
+            # structure is fully oxidized, no need to do anything
+            # no need to hack  the poscar or potcar
+            poscar_need_hack = False
+
+        else:
+            # structure must be partially reduced; hack MAGMOM
+            list_oxidizable_site_indices = self.sort_TM_sites_by_Na_distance(Na_indices)
+
+            MAGMOM = self.build_magmom(list_oxidizable_site_indices,number_of_electrons)
+            LDAU_dict['MAGMOM'] = MAGMOM 
+
+            poscar_need_hack = True
+
+        return LDAU_dict, poscar_need_hack, potcar_need_hack  
+
 
 
 class U_Strategy_HexaCyanoFerrate(U_Strategy):
@@ -345,5 +466,3 @@ class U_Strategy_HexaCyanoFerrate_U_is_5_7(U_Strategy_HexaCyanoFerrate):
 
     def get_LDAU(self):
         super(U_Strategy_HexaCyanoFerrate_U_is_5_7, self).get_LDAU(U_Fe_N = 7., U_Fe_C = 5.)
-
-
