@@ -164,7 +164,9 @@ class U_Strategy_MaterialsProject(U_Strategy):
         for i_s, site in enumerate(self.structure):
             if i_s in dict_oxidizable:
                 # add a bit of randomness to not get trapped in metastable solution.
-                random_addition = 0.2*np.random.random(1)[0]-0.1
+                # It is quite useless to have a random number with 16 decimals, and it 
+                # makes the INCAR ugly; let's round.
+                random_addition = np.round( 0.2*np.random.random(1)[0]-0.1, 6)
                 MAGMOM.append(dict_oxidizable[i_s]+random_addition)
             else:
                 MAGMOM.append(0.6)
