@@ -263,8 +263,8 @@ class U_Strategy_MaterialsProject_V2(U_Strategy):
         MAGMOM = []
         # tabulate how many sites must be reduced from every species in the variable_magnetization_dict.
         reduction_counter = {}
-        for key in variable_magnetization_dict:
-            reduction_counter[key] = variable_magnetization_dict[key]['n_reduced']
+        for key in self.variable_magnetization_dict:
+            reduction_counter[key] = self.variable_magnetization_dict[key]['n_reduced']
 
         dict_reduction = {}
         #reduce according to proximity
@@ -272,10 +272,10 @@ class U_Strategy_MaterialsProject_V2(U_Strategy):
             symbol = self.structure.sites[i_s].specie.symbol
             
             if reduction_counter[symbol] > 0:
-                dict_reduction[i_s] = variable_magnetization_dict[symbol]['m_reduced']
+                dict_reduction[i_s] = self.variable_magnetization_dict[symbol]['m_reduced']
                 reduction_counter[symbol] -= 1
             elif reduction_counter[symbol] == 0:
-                dict_reduction[i_s] = variable_magnetization_dict[symbol]['m_oxidized']
+                dict_reduction[i_s] = self.variable_magnetization_dict[symbol]['m_oxidized']
 
             else:
                 print("SOMETHING IS WRONG. REVIEW CODE!")
@@ -299,7 +299,7 @@ class U_Strategy_MaterialsProject_V2(U_Strategy):
         """ Produce LDAU related variables, to be passed to VASP as strings """
 
         # let's simply use the default as a first step
-        LDAU_dict, poscar_need_hack, potcar_need_hack = super(U_Strategy_MaterialsProject, self).get_LDAU()
+        LDAU_dict, poscar_need_hack, potcar_need_hack = super(U_Strategy_MaterialsProject_V2, self).get_LDAU()
 
         Na_indices = self.structure.indices_from_symbol('Na')
 
