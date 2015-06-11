@@ -93,15 +93,14 @@ class U_Strategy_MaterialsProject(U_Strategy):
 
         input:        
             variable_magnetization_dict: 
-                                    - key: elements which can have different oxydation states
+                                    - key: elements which can have different oxidation states
                                     - value: magnetization to be put in MAGMOM, most oxidized case first.
 
         Note: 
             In a perfect world, we would import a strong AI (or just a better code) which would automatically
             determine the best starting MAGMOM for a given partially sodiated structure. In this world, however,            
-            I don't have time to design/build/test the perfect solution and some a priori info will have to be passed to this
-            object.
-
+            I don't have time to design/build/test the perfect solution and some a priori info will have to be 
+            passed to this object.
         """
 
         self.structure_has_been_read = False
@@ -192,6 +191,123 @@ class U_Strategy_MaterialsProject(U_Strategy):
             MAGMOM = self.build_magmom(list_oxidizable_site_indices,number_of_electrons)
             LDAU_dict['MAGMOM'] = MAGMOM 
 
+
+        return LDAU_dict, poscar_need_hack, potcar_need_hack  
+
+
+
+class U_Strategy_MaterialsProject_V2(U_Strategy):
+    """
+    Class to create LDAU strings for VASP input, starting from what the MaterialsProject already
+    provides, but with variable starting magnetization on the transition metal sites.
+
+    A different algorithm is implemented (previous is maintained for production runs to keep running).
+    """
+    
+    def __init__(self,variable_magnetization_dict={'Fe':{'n_reduced':0,'m_reduced':4,'m_oxidized':5}}):
+        """ 
+
+        input:        
+            variable_magnetization_dict: 
+                                    - key: elements which can have different oxidation states
+                                    - value: dictionary containing number of reduced elements, and corresponding
+                                             trial magnetization.
+
+        Note: 
+            In a perfect world, we would import a strong AI (or just a better code) which would automatically
+            determine the best starting MAGMOM for a given partially sodiated structure. In this world, however,            
+            I don't have time to design/build/test the perfect solution and some a priori info will have to be 
+            passed to this object.
+        """
+
+        self.structure_has_been_read = False
+
+        self._LDAU_KEYS = ['LDAUTYPE', 'LDAUPRINT', 'MAGMOM', 'LDAUL', 'LDAUJ', 'LDAUU', 'LDAU'] 
+
+        self.variable_magnetization_dict = variable_magnetization_dict 
+
+
+    def sort_TM_sites_by_Na_distance(self,Na_indices):
+        """
+        Sort sites that may be oxidized.
+        """
+
+        list_oxidizable_site_indices = []        
+
+        if len(Na_indices) != 0:
+            distance_table = self.structure.distance_matrix[:,Na_indices]
+        # find all elements in the structure which can be reduced/oxidized,
+        # and the minimum distance to a Na atom
+        list_d = []
+        for i_s, site in enumerate(self.structure.sites):
+            if site.specie.symbol in self.variable_magnetization_dict: 
+
+                list_oxidizable_site_indices.append(i_s)
+
+                if len(Na_indices) != 0:
+                    dist = np.min(distance_table[i_s])
+                    list_d.append(dist) 
+
+        # Sort this list_according to distance
+        if len(Na_indices) != 0:
+            I = np.argsort(list_d)
+            list_oxidizable_site_indices = np.array(list_oxidizable_site_indices)[I]
+
+        return list_oxidizable_site_indices 
+  
+    def build_magmom(self,list_oxidizable_site_indices):
+        """
+        Build MAGMOM, given that some sites must be reduced
+        """
+
+        MAGMOM = []
+        # tabulate how many sites must be reduced from every species in the variable_magnetization_dict.
+        reduction_counter = {}
+        for key in variable_magnetization_dict:
+            reduction_counter[key] = variable_magnetization_dict[key]['n_reduced']
+
+        dict_reduction = {}
+        #reduce according to proximity
+        for i_s in list_oxidizable_site_indices:
+            symbol = self.structure.sites[i_s].specie.symbol
+            
+            if reduction_counter[symbol] > 0:
+                dict_reduction[i_s] = variable_magnetization_dict[symbol]['m_reduced']
+                reduction_counter[symbol] -= 1
+            elif reduction_counter[symbol] == 0:
+                dict_reduction[i_s] = variable_magnetization_dict[symbol]['m_oxidized']
+
+            else:
+                print("SOMETHING IS WRONG. REVIEW CODE!")
+                sys.exit()
+
+        for i_s, site in enumerate(self.structure):
+            if i_s in dict_reduction:
+                # add a bit of randomness to not get trapped in metastable solution.
+                # It is quite useless to have a random number with 16 decimals, and it 
+                # makes the INCAR ugly; let's round.
+                random_addition = np.round( 0.2*np.random.random(1)[0]-0.1, 6)
+                MAGMOM.append(dict_reduction[i_s]+random_addition)
+            else:
+                MAGMOM.append(0.6)
+
+        return MAGMOM 
+
+
+
+    def get_LDAU(self):
+        """ Produce LDAU related variables, to be passed to VASP as strings """
+
+        # let's simply use the default as a first step
+        LDAU_dict, poscar_need_hack, potcar_need_hack = super(U_Strategy_MaterialsProject, self).get_LDAU()
+
+        Na_indices = self.structure.indices_from_symbol('Na')
+
+        #  hack MAGMOM
+        list_oxidizable_site_indices = self.sort_TM_sites_by_Na_distance(Na_indices)
+
+        MAGMOM = self.build_magmom(list_oxidizable_site_indices)
+        LDAU_dict['MAGMOM'] = MAGMOM 
 
         return LDAU_dict, poscar_need_hack, potcar_need_hack  
 
