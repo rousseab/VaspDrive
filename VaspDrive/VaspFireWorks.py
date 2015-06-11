@@ -108,7 +108,7 @@ class MyVaspFireTask(FireTaskBase):
             src = fw_spec['previous_launch_dir']+'/CHGCAR'
             dst = launch_dir+'/CHGCAR'
 
-        if self.job_type == 'relax' or self.job_type == 'ground_state':
+        if self.job_type == 'coarse_relax' or self.job_type == 'relax' or self.job_type == 'ground_state':
             try:
                 shutil.move(src, dst)            
             except:
