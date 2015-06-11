@@ -87,6 +87,89 @@ def compute_voltage(list_x_alkali,list_energies_per_unit,E_alkali):
 
     return np.array(list_x_plateau), np.array(list_V_plateau)
 
+class projected_DOS_reader(object):
+    """
+    This function wraps around the code I wrote to extract meaningful
+    partial dos from what ASE extracts.
+    """
+    def __init__(self,DOSCAR_path,json_data_path):
+        """
+        Object requires paths to DOSCAR, a cif file containing the appropriate structure
+        and the path to the appropriate run_data.json file, to extract the number of electrons
+        """
+
+        self.get_nelect_and_structure(json_data_path)
+        self.read_DOSCAR(DOSCAR_path)
+
+
+    def get_nelect_and_structure(self,json_data_path):
+
+        with  open(json_data_path,'r') as f:
+            data_dictionary = json.load(f)
+
+        self.nelect = data_dictionary['OUTCAR']['nelect']
+        self.EF_from_outcar = data_dictionary['OUTCAR']['efermi']
+        self.structure = pymatgen.Structure.from_dict(data_dictionary['relaxation'][-1]['structure'])
+
+
+    def read_DOSCAR(self,DOSCAR_path):
+
+        doscar = VaspDos(DOSCAR_path)
+
+        # consistency check
+        number_of_atoms_DOSCAR_FILE = doscar._site_dos.shape[0]
+        number_of_atoms_CIF_FILE = len(self.structure)
+
+        if number_of_atoms_CIF_FILE  != number_of_atoms_DOSCAR_FILE: 
+            print( 'Number of atoms in DOSCAR and CIF file are not equal!')
+            print( 'inconsistent files; results would be meaningless')
+            print('     *****   STOP  ******')
+            sys.exit()
+
+        self.energy = doscar.energy
+        self.integrated_dos = np.sum(doscar.integrated_dos,axis=0)
+
+        self.compute_EF()
+
+        self.DOS_up =  doscar.dos[0,:]
+        self.DOS_dn =  doscar.dos[1,:]
+
+        indices_up = np.arange(0,18,2)
+        indices_dn = np.arange(1,19,2)
+
+        self.pdos_dict = {}
+    
+        for specie in self.structure.types_of_specie:
+
+            pdos_up = np.zeros_like(self.DOS_up)
+            pdos_dn = np.zeros_like(self.DOS_dn)
+
+            for i,site in enumerate(self.structure):
+                if site.specie == specie:
+
+                    for iu in indices_up:
+                        pdos_up += doscar.site_dos(i,iu)
+                    for id in indices_dn: 
+                        pdos_dn += doscar.site_dos(i,id)
+
+            self.pdos_dict['%s_up'%specie.symbol] = pdos_up 
+            self.pdos_dict['%s_dn'%specie.symbol] = pdos_dn
+
+
+
+    def compute_EF(self):
+
+        imax = np.where(self.integrated_dos >= self.nelect)[0][0]
+        imin = np.where(self.integrated_dos < self.nelect)[0][-1]
+
+        e1 = self.energy[imin]
+        e2 = self.energy[imax]
+
+        d1 = self.integrated_dos[imin]
+        d2 = self.integrated_dos[imax]
+
+        self.EF = ((e1-e2)*self.nelect+e2*d1-e1*d2)/(d1-d2)
+
 class AnalyseJsonData():
     """
     Class which will easily extract data from "run_data.json" files.
@@ -254,6 +337,89 @@ class AnalyseMaterialsProjectJsonData():
 
         return computed_entries 
 
+class AnalyseMaterialsProjectJsonDataWithComputedEntries():
+    """
+    Class which will wrap around boilerplate analysis of MaterialsProject-like
+    json files, containing data extracted using borgs and queens.
+
+    It will be assumed that we are providing ComputedEntries objects directly.
+    """
+
+    def __init__(self):
+        # some MP analysis power tools
+        self.compat  = MaterialsProjectCompatibility()
+
+        return
+
+    def extract_alkali_energy(self, computed_Alkali_entry ):
+        processed_Alkali_entry = self.compat.process_entry(computed_Alkali_entry)
+        self.E_Alkali = processed_Alkali_entry.energy
+        return
+
+    def extract_phase_diagram_info(self,MP_phase_diagram_json_data_filename):
+
+        computed_entries  = self._extract_MP_data(MP_phase_diagram_json_data_filename)
+        processed_entries = self.compat.process_entries(computed_entries)
+
+        pd = PhaseDiagram(processed_entries)
+        self.phase_diagram_analyser = PDAnalyzer(pd)
+
+        return
+
+    def extract_processed_entries(self,computed_entries):
+        processed_entries = self.compat.process_entries(computed_entries)
+
+        return processed_entries
+
+    def extract_energies_above_hull(self,computed_entries,alkali):
+
+        processed_entries = self.extract_processed_entries(computed_entries)
+
+        list_energy_above_hull  = []
+        list_alkali_content = []
+
+        for entry in processed_entries: 
+            decomposition_dict, energy_above_hull  = \
+                self.phase_diagram_analyser.get_decomp_and_e_above_hull(entry, allow_negative=True)
+
+            list_energy_above_hull.append(energy_above_hull)  
+            list_alkali_content.append(entry.composition[alkali])
+
+        list_energy_above_hull  = np.array(list_energy_above_hull)
+        list_alkali_content     = np.array(list_alkali_content )
+
+        return list_alkali_content, list_energy_above_hull  
+
+    def extract_energies(self,computed_entries,alkali):
+
+        processed_entries = self.extract_processed_entries(computed_entries)
+
+        list_energy         = []
+        list_alkali_content = []
+        for entry in processed_entries:
+            list_energy.append(entry.energy)
+            list_alkali_content.append(entry.composition[alkali])
+
+        list_energy         = np.array(list_energy)
+        list_alkali_content = np.array(list_alkali_content )
+
+        I = np.argsort(list_alkali_content )
+        
+        return list_alkali_content[I], list_energy[I]
+
+    def _extract_MP_data(self,MP_data_filename):
+
+        drone = VaspToComputedEntryDrone()
+        queen = BorgQueen(drone, "dummy", 1)
+
+        queen.load_data(MP_data_filename)
+        computed_entries = queen.get_data()
+
+        del drone
+        del queen
+
+        return computed_entries 
+
 class AnalyseMaterialsProjectJsonData_NoProcess(AnalyseMaterialsProjectJsonData):
     """
     The Materials Project processing facilities will normalize energies as long as
@@ -271,8 +437,6 @@ class AnalyseMaterialsProjectJsonData_NoProcess(AnalyseMaterialsProjectJsonData)
         #processed_entries = self.compat.process_entries(computed_entries)
 
         return computed_entries 
-
-
 
 class AnalyseDensityMatrix(object):
     """ Class to parse the density matrix out of the OUTCAR file (if present) """
