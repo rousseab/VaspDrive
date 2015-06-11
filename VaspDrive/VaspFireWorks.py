@@ -331,102 +331,24 @@ class MyAnalysisFireTask(FireTaskBase):
 
         return firework_action 
 
-    def update_spec_and_launch_fireworks(self,structure, max_force, fw_spec):
 
-        fw_spec['structure'] = structure 
-        fw_spec['previous_launch_dir'] = fw_spec['_launch_dir']
+    def define_job_dictionaries(self):
+        """ Simple convenience to define job parameters for various situations """
 
-        formula  = structure.formula.replace(' ','')
+        self.GS_dict  = dict(    EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
+                                 ENCUT   =   520,        # HIGH encut
+                                 PREC    =   'ACCURATE', # level of precision
+                                 NSW     =     0,        # no ionic steps: fixed ions
+                                 ICHARG  =     1,        # read in the CHGCAR file
+                                 LORBIT  =   11,         # 11 prints out the DOS
+                                 LCHARG  =   True,       # Write charge densities?
+                                 LWAVE   =   False,      # write out the wavefunctions?
+                                 NELM    =   100,        # maximum number of SCF cycles 
+                                 ADDGRID =   True,       # fine FFT grid; not sure if this is needed for bader?
+                                 LAECHG  =   True)       # Compute and write CORE electronic density, for BADER
 
-        if self.job_type == 'relax': 
-
-            if max_force < 0.05 or self.version > 8: 
-                # relaxations are done, or it is hopless to reduce forces! Let's do a ground state!                    
-                fw_spec['job_type'] = 'ground_state'
-                fw_spec['name'] = formula+'_ground_state_V%i'%(self.version)  
-                fw_spec['_launch_dir'] = fw_spec['top_dir']+'/ground_state_V%i/'%(self.version)  
-                fw_spec['ground_state_dir'] = fw_spec['_launch_dir']  # for other post-processing to know where to get densities
-
-                GS_dict  = dict(    EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
-                                    PREC    =   'ACCURATE', # level of precision
-                                    NSW     =     0,        # no ionic steps: fixed ions
-                                    ICHARG  =     1,        # read in the CHGCAR file
-                                    LORBIT  =   11,         # 11 prints out the DOS
-                                    LCHARG  =   True,       # Write charge densities?
-                                    LWAVE   =   False,      # write out the wavefunctions?
-                                    NELM    =   100,        # maximum number of SCF cycles 
-                                    ADDGRID =   True,       # fine FFT grid; not sure if this is needed for bader?
-                                    LAECHG  =   True)       # Compute and write CORE electronic density, for BADER
-
-                if 'supplementary_incar_dict' in fw_spec:
-                    fw_spec['supplementary_incar_dict'].update(GS_dict) 
-                else:
-                    fw_spec['supplementary_incar_dict'] = GS_dict 
-
-                new_fw = Firework(MyVaspFireTask(), fw_spec)
-
-                return FWAction(additions=new_fw)
-
-            else:
-                #  we must relax some more
-                fw_spec['job_type'] = 'relax'
-                self.version += 1
-                fw_spec['version'] = self.version
-                fw_spec['name'] = formula+'_relax_V%i'%(self.version)  
-                fw_spec['_launch_dir'] = fw_spec['top_dir']+'/relax_V%i/'%(self.version)  
-
-
-                if self.version > 4:
-                    # relaxation is in distress!
-                    potim = 0.2
-                else:
-                    # default value
-                    potim = 0.5
-                # no need to work too hard; forces are large, convergence
-                # need not be stringent
-                if max_force > 0.3:
-                    relax_dict = dict(    LCHARG  =   True,       # Write charge densities?
-                                          PREC    =   'NORMAL',   # level of precision
-                                          EDIFF   =   1E-3,       # criterion to stop SCF loop, in eV
-                                          EDIFFG  =  -2E-1,       # criterion to stop ionic relaxations. Negative means FORCES < |EDIFFG|
-                                          NELM    =    10,        # maximum number of SCF cycles 
-                                          ICHARG  =     1,        # read in the CHGCAR file
-                                          IBRION  =     2,        # use the robust CG algorithm
-                                          ISIF    =     0,        # Don't relax cell shape 
-                                          POTIM   =   potim,      # controls step in relaxation algorithm
-                                          NSW     =     20)       # max number of ionic steps: if it takes more, something is wrong.
-                else:
-                    relax_dict = dict(    LCHARG  =   True,       # Write charge densities?
-                                          PREC    =   'ACCURATE', # level of precision
-                                          EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
-                                          EDIFFG  =  -5E-2,       # criterion to stop ionic relaxations. Negative means FORCES < |EDIFFG|
-                                          NELM    =    20,        # maximum number of SCF cycles 
-                                          ICHARG  =     1,        # read in the CHGCAR file
-                                          IBRION  =     1,        # use the RMM-DIIS algorithm
-                                          ISIF    =     3,        # Do relax cell shape 
-                                          POTIM   =   potim,      # controls step in relaxation algorithm
-                                          NSW     =     30)       # max number of ionic steps: if it takes more, something is wrong.
-
-                if 'supplementary_incar_dict' in fw_spec:
-                    fw_spec['supplementary_incar_dict'].update(relax_dict) 
-                else:
-                    fw_spec['supplementary_incar_dict'] = relax_dict
-
-                new_fw = Firework(MyVaspFireTask(), fw_spec)
-                return FWAction(additions=new_fw)
-
-        if self.job_type == 'ground_state': 
-            # let's do the DOS and BADER next!
-
-            fw_spec_DOS = deepcopy(fw_spec)
-            
-            fw_spec_DOS['job_type'] = 'DOS'
-            fw_spec_DOS['name'] = formula+'_DOS_V%i'%(self.version)  
-            fw_spec_DOS['_launch_dir'] = fw_spec['top_dir']+'/DOS_V%i/'%(self.version)  
-
-            # Careful! This dict is added to variables already present because of Pymatgen,
-            # and there is a consistency check
-            DOS_dict = dict(    EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
+        self.DOS_dict = dict(   EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
+                                 ENCUT   =   520,       # HIGH encut
                                 PREC    =   'ACCURATE', # level of precision
                                 NSW     =   0,          # no ionic steps: fixed ions
                                 LORBIT  =   11,         # 11 prints out the DOS
@@ -442,10 +364,140 @@ class MyAnalysisFireTask(FireTaskBase):
                                 EMAX    =    10,        # maximum energy for DOS
                                 NEDOS   =   2000)       # how many points for DOS calculation
 
-            if 'supplementary_incar_dict' in fw_spec_DOS:
-                fw_spec_DOS['supplementary_incar_dict'].update(DOS_dict) 
+
+
+        self.coarse_relax_dict = dict(    LCHARG  =  True,      # Write charge densities?
+                                          PREC    = 'MEDIUM',   # level of precision
+                                          EDIFF   =   1E-4,     # criterion to stop SCF loop, in eV
+                                          EDIFFG  =  -5E-2,     # criterion to stop ionic relaxations. Negative means FORCES < |EDIFFG|
+                                          ENCUT   =   260,      # LOW encut
+                                          NELM    =    30,      # maximum number of SCF cycles 
+                                          ICHARG  =     1,      # read in the CHGCAR file
+                                          IBRION  =     1,      # use the RMM-DIIS algorithm
+                                          ISIF    =     3,      # Relax cell shape 
+                                          POTIM   =    0.5,    # controls step in relaxation algorithm
+                                          NSW     =     30)     # max number of ionic steps: if it takes more, something is wrong.
+
+        self.fine_relax_dict = dict(      LCHARG  =   True,       # Write charge densities?
+                                          PREC    =   'ACCURATE', # level of precision
+                                          EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
+                                          EDIFFG  =  -5E-2,       # criterion to stop ionic relaxations. Negative means FORCES < |EDIFFG|
+                                          ENCUT   =   520,        # HIGH encut
+                                          NELM    =    30,        # maximum number of SCF cycles 
+                                          ICHARG  =     1,        # read in the CHGCAR file
+                                          IBRION  =     1,        # use the RMM-DIIS algorithm
+                                          ISIF    =     3,        # Do relax cell shape 
+                                          POTIM   =     0.5,      # controls step in relaxation algorithm
+                                          NSW     =     30)       # max number of ionic steps: if it takes more, something is wrong.
+
+
+    def update_spec_and_launch_fireworks(self,structure, max_force, fw_spec):
+
+        fw_spec['structure'] = structure 
+        fw_spec['previous_launch_dir'] = fw_spec['_launch_dir']
+
+        formula  = structure.formula.replace(' ','')
+        self.define_job_dictionaries()
+
+        if self.job_type == 'relax': 
+            if max_force < 0.05 or self.version > 8: 
+                # relaxations are done, or it is hopless to reduce forces! Let's do a ground state!                    
+                fw_spec['job_type'] = 'ground_state'
+                fw_spec['name'] = formula+'_ground_state_V%i'%(self.version)  
+                fw_spec['_launch_dir'] = fw_spec['top_dir']+'/ground_state_V%i/'%(self.version)  
+                fw_spec['ground_state_dir'] = fw_spec['_launch_dir']  # for other post-processing to know where to get densities
+
+                if 'supplementary_incar_dict' in fw_spec:
+                    fw_spec['supplementary_incar_dict'].update(self.GS_dict) 
+                else:
+                    fw_spec['supplementary_incar_dict'] = self.GS_dict 
+
+                new_fw = Firework(MyVaspFireTask(), fw_spec)
+
+                return FWAction(additions=new_fw)
+
             else:
-                fw_spec_DOS['supplementary_incar_dict'] = DOS_dict
+                #  we must relax some more
+                fw_spec['job_type'] = 'relax'
+                self.version += 1
+                fw_spec['version'] = self.version
+                fw_spec['name'] = formula+'_relax_V%i'%(self.version)  
+                fw_spec['_launch_dir'] = fw_spec['top_dir']+'/relax_V%i/'%(self.version)  
+
+                if self.version > 6:
+                    # relaxation is in distress!
+                    potim = 0.2
+                else:
+                    # default value
+                    potim = 0.5
+
+                if 'supplementary_incar_dict' in fw_spec:
+                    fw_spec['supplementary_incar_dict'].update(self.fine_relax_dict) 
+                else:
+                    fw_spec['supplementary_incar_dict'] = self.fine_relax_dict
+
+                fw_spec['supplementary_incar_dict'].update({'potim':potim})
+
+                new_fw = Firework(MyVaspFireTask(), fw_spec)
+                return FWAction(additions=new_fw)
+
+        if self.job_type == 'coarse_relax': 
+            if max_force < 0.05 or self.version > 8: 
+                # relaxations are done, or it is hopless to reduce forces! Let's go to fine_relax'
+                fw_spec['job_type'] = 'relax'
+                fw_spec['name'] = formula+'_relax_V%i'%(self.version)  
+                fw_spec['_launch_dir'] = fw_spec['top_dir']+'/relax_V%i/'%(self.version)  
+                fw_spec['ground_state_dir'] = fw_spec['_launch_dir']  # for other post-processing to know where to get densities
+
+                if 'supplementary_incar_dict' in fw_spec:
+                    fw_spec['supplementary_incar_dict'].update(self.fine_relax_dict)
+                else:
+                    fw_spec['supplementary_incar_dict'] = self.fine_relax_dict
+
+                new_fw = Firework(MyVaspFireTask(), fw_spec)
+
+                return FWAction(additions=new_fw)
+
+            else:
+                #  we must relax some more
+                fw_spec['job_type'] = 'coarse_relax'
+                self.version += 1
+                fw_spec['version'] = self.version
+                fw_spec['name'] = formula+'_coarse_relax_V%i'%(self.version)  
+                fw_spec['_launch_dir'] = fw_spec['top_dir']+'/coarse_relax_V%i/'%(self.version)  
+
+                if self.version > 6:
+                    # relaxation is in distress!
+                    potim = 0.2
+                else:
+                    # default value
+                    potim = 0.5
+
+                if 'supplementary_incar_dict' in fw_spec:
+                    fw_spec['supplementary_incar_dict'].update(self.coarse_relax_dict) 
+                else:
+                    fw_spec['supplementary_incar_dict'] = self.coarse_relax_dict
+
+                fw_spec['supplementary_incar_dict'].update({'potim':potim})
+
+                new_fw = Firework(MyVaspFireTask(), fw_spec)
+                return FWAction(additions=new_fw)
+
+
+        if self.job_type == 'ground_state': 
+            # let's do the DOS and BADER next!
+
+            fw_spec_DOS = deepcopy(fw_spec)
+            
+            fw_spec_DOS['job_type'] = 'DOS'
+            fw_spec_DOS['name'] = formula+'_DOS_V%i'%(self.version)  
+            fw_spec_DOS['_launch_dir'] = fw_spec['top_dir']+'/DOS_V%i/'%(self.version)  
+
+
+            if 'supplementary_incar_dict' in fw_spec_DOS:
+                fw_spec_DOS['supplementary_incar_dict'].update(self.DOS_dict) 
+            else:
+                fw_spec_DOS['supplementary_incar_dict'] = self.DOS_dict
 
             new_DOS_fw = Firework(MyVaspFireTask(), fw_spec_DOS)
 
