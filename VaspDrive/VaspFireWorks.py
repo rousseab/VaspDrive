@@ -168,6 +168,12 @@ class MyVaspFireTask(FireTaskBase):
                 self.U_strategy = U_Strategy_HexaCyanoFerrate()
             elif  d['strategy_type'] == 'MaterialsProject':
                 self.U_strategy = U_Strategy_MaterialsProject(variable_magnetization_dict={'Fe':[5,4]})
+            elif  d['strategy_type'] == 'MaterialsProject_V2':
+                if 'variable_magnetization_dict' not in d:
+                    print("==== ERROR: the variable 'variable_magnetization_dict' must be defined!")
+                    sys.exit()
+                variable_magnetization_dict = d['variable_magnetization_dict']
+                self.U_strategy = U_Strategy_MaterialsProject_V2(variable_magnetization_dict)
 
             else:
                 print("UNKNOWN STRATEGY! FAIL HARD")
