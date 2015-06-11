@@ -87,6 +87,140 @@ def compute_voltage(list_x_alkali,list_energies_per_unit,E_alkali):
 
     return np.array(list_x_plateau), np.array(list_V_plateau)
 
+
+class VaspDos(object):
+    """Class for representing density-of-states produced by VASP
+
+    The energies are in property self.energy
+
+    Site-projected DOS is accesible via the self.site_dos method.
+
+    Total and integrated DOS is accessible as numpy.ndarray's in the
+    properties self.dos and self.integrated_dos. If the calculation is
+    spin polarized, the arrays will be of shape (2, NDOS), else (1,
+    NDOS).
+
+    The self.efermi property contains the currently set Fermi
+    level. Changing this value shifts the energies.
+
+    """
+
+    def __init__(self, doscar='DOSCAR', efermi=0.0):
+        """Initialize"""
+        self._efermi = 0.0
+        self.read_doscar(doscar)
+        self.efermi = efermi
+
+    def _set_efermi(self, efermi):
+        """Set the Fermi level."""
+        ef = efermi - self._efermi
+        self._efermi = efermi
+        self._total_dos[0, :] = self._total_dos[0, :] - ef
+        try:
+            self._site_dos[:, 0, :] = self._site_dos[:, 0, :] - ef
+        except IndexError:
+            pass
+
+    def _get_efermi(self):
+        return self._efermi
+
+    efermi = property(_get_efermi, _set_efermi, None, "Fermi energy.")
+
+    def _get_energy(self):
+        """Return the array with the energies."""
+        return self._total_dos[0, :]
+    energy = property(_get_energy, None, None, "Array of energies")
+
+    def site_dos(self, atom, orbital):
+        """Return an NDOSx1 array with dos for the chosen atom and orbital.
+
+        atom: int
+            Atom index
+        orbital: int or str
+            Which orbital to plot
+
+        If the orbital is given as an integer:
+        If spin-unpolarized calculation, no phase factors:
+        s = 0, p = 1, d = 2
+        Spin-polarized, no phase factors:
+        s-up = 0, s-down = 1, p-up = 2, p-down = 3, d-up = 4, d-down = 5
+        If phase factors have been calculated, orbitals are
+        s, py, pz, px, dxy, dyz, dz2, dxz, dx2
+        double in the above fashion if spin polarized.
+
+        """
+        # Integer indexing for orbitals starts from 1 in the _site_dos array
+        # since the 0th column contains the energies
+        if isinstance(orbital, int) or isinstance(orbital, np.int64):
+            return self._site_dos[atom, orbital + 1, :]
+        n = self._site_dos.shape[1]
+        if n == 4:
+            norb = {'s':1, 'p':2, 'd':3}
+        elif n == 7:
+            norb = {'s+':1, 's-up':1, 's-':2, 's-down':2,
+                    'p+':3, 'p-up':3, 'p-':4, 'p-down':4,
+                    'd+':5, 'd-up':5, 'd-':6, 'd-down':6}
+        elif n == 10:
+            norb = {'s':1, 'py':2, 'pz':3, 'px':4,
+                    'dxy':5, 'dyz':6, 'dz2':7, 'dxz':8,
+                    'dx2':9}
+        elif n == 19:
+            norb = {'s+':1, 's-up':1, 's-':2, 's-down':2,
+                    'py+':3, 'py-up':3, 'py-':4, 'py-down':4,
+                    'pz+':5, 'pz-up':5, 'pz-':6, 'pz-down':6,
+                    'px+':7, 'px-up':7, 'px-':8, 'px-down':8,
+                    'dxy+':9, 'dxy-up':9, 'dxy-':10, 'dxy-down':10,
+                    'dyz+':11, 'dyz-up':11, 'dyz-':12, 'dyz-down':12,
+                    'dz2+':13, 'dz2-up':13, 'dz2-':14, 'dz2-down':14,
+                    'dxz+':15, 'dxz-up':15, 'dxz-':16, 'dxz-down':16,
+                    'dx2+':17, 'dx2-up':17, 'dx2-':18, 'dx2-down':18}
+        return self._site_dos[atom, norb[orbital.lower()], :]
+
+    def _get_dos(self):
+        if self._total_dos.shape[0] == 3:
+            return self._total_dos[1, :]
+        elif self._total_dos.shape[0] == 5:
+            return self._total_dos[1:3, :]
+    dos = property(_get_dos, None, None, 'Average DOS in cell')
+
+    def _get_integrated_dos(self):
+        if self._total_dos.shape[0] == 3:
+            return self._total_dos[2, :]
+        elif self._total_dos.shape[0] == 5:
+            return self._total_dos[3:5, :]
+    integrated_dos = property(_get_integrated_dos, None, None,
+                              'Integrated average DOS in cell')
+
+    def read_doscar(self, fname="DOSCAR"):
+        """Read a VASP DOSCAR file"""
+        f = open(fname)
+        natoms = int(f.readline().split()[0])
+        [f.readline() for nn in range(4)]  # Skip next 4 lines.
+        # First we have a block with total and total integrated DOS
+        ndos = int(f.readline().split()[2])
+        dos = []
+        for nd in range(ndos):
+            dos.append(np.array([float(x) for x in f.readline().split()]))
+        self._total_dos = np.array(dos).T
+        # Next we have one block per atom, if INCAR contains the stuff
+        # necessary for generating site-projected DOS
+        dos = []
+        for na in range(natoms):
+            line = f.readline()
+            if line == '':
+                # No site-projected DOS
+                break
+            ndos = int(line.split()[2])
+            line = f.readline().split()
+            cdos = np.empty((ndos, len(line)))
+            cdos[0] = np.array(line)
+            for nd in range(1, ndos):
+                line = f.readline().split()
+                cdos[nd] = np.array([float(x) for x in line])
+            dos.append(cdos.T)
+        self._site_dos = np.array(dos)
+
+
 class projected_DOS_reader(object):
     """
     This function wraps around the code I wrote to extract meaningful
