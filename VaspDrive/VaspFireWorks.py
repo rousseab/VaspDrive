@@ -371,9 +371,9 @@ class MyAnalysisFireTask(FireTaskBase):
                                           EDIFF   =   1E-4,     # criterion to stop SCF loop, in eV
                                           EDIFFG  =  -5E-2,     # criterion to stop ionic relaxations. Negative means FORCES < |EDIFFG|
                                           ENCUT   =   260,      # LOW encut
-                                          NELM    =    30,      # maximum number of SCF cycles 
+                                          NELM    =    40,      # maximum number of SCF cycles 
                                           ICHARG  =     1,      # read in the CHGCAR file
-                                          IBRION  =     1,      # use the RMM-DIIS algorithm
+                                          IBRION  =     2,      # use the CG algorithm
                                           ISIF    =     3,      # Relax cell shape 
                                           POTIM   =    0.5,    # controls step in relaxation algorithm
                                           NSW     =     30)     # max number of ionic steps: if it takes more, something is wrong.
@@ -383,7 +383,7 @@ class MyAnalysisFireTask(FireTaskBase):
                                           EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
                                           EDIFFG  =  -5E-2,       # criterion to stop ionic relaxations. Negative means FORCES < |EDIFFG|
                                           ENCUT   =   520,        # HIGH encut
-                                          NELM    =    30,        # maximum number of SCF cycles 
+                                          NELM    =    40,        # maximum number of SCF cycles 
                                           ICHARG  =     1,        # read in the CHGCAR file
                                           IBRION  =     1,        # use the RMM-DIIS algorithm
                                           ISIF    =     3,        # Do relax cell shape 
