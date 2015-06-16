@@ -370,11 +370,11 @@ class AnalyseJsonData():
 
         list_max_forces = []
         for data_dictionary in self.list_data_dictionaries:
-            forces = np.data(data_dictionary['relaxation'][-1]['forces'])
+            forces = np.array(data_dictionary['relaxation'][-1]['forces'])
             max_force = np.max( np.sqrt(np.sum( forces**2, axis=1)) )
             list_max_forces.append(max_force)
 
-        return np.array(list_max_force)
+        return np.array(list_max_forces)
 
     def extract_magnetization(self,Element=None):
         MAG = []
