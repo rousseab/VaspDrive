@@ -357,7 +357,6 @@ class AnalyseJsonData():
 
         return list_compositions
 
-
     def extract_energies(self):
 
         list_energies = []
@@ -367,8 +366,17 @@ class AnalyseJsonData():
 
         return np.array(list_energies)
 
+    def extract_max_forces(self):
 
-    def extract_magnetization(self,Element):
+        list_max_forces = []
+        for data_dictionary in self.list_data_dictionaries:
+            forces = np.array(data_dictionary['relaxation'][-1]['forces'])
+            max_force = np.max( np.sqrt(np.sum( forces**2, axis=1)) )
+            list_max_forces.append(max_force)
+
+        return np.array(list_max_forces)
+
+    def extract_magnetization(self,Element=None):
         MAG = []
 
         for data_dictionary, structure in zip(self.list_data_dictionaries,self.list_structures):
@@ -376,7 +384,10 @@ class AnalyseJsonData():
             list_mag = []
 
             for site, d in zip(structure,list_d):
-                if site.specie == Element:
+
+                if Element == None: 
+                    list_mag.append(d['tot'])
+                elif site.specie == Element:
                     list_mag.append(d['tot'])
 
             MAG.append(list_mag)
