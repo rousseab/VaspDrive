@@ -116,12 +116,15 @@ def extract_json_data():
             print('ComputedEntry COULD NOT BE EXTRACTED BY PYMATGEN...')
 
 
+        """
+        #  Do not extract DOS in run_data.json; this is too memory intensive!
         try:
             dictionary_data['DOS'] = vr.complete_dos.as_dict()
             pymatgen_dos_success = True
         except:
             print('DOS COULD NOT BE EXTRACTED BY PYMATGEN...')
             pymatgen_dos_success = False
+        """
 
 
         relaxation_data = []
