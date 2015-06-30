@@ -365,7 +365,6 @@ class MyAnalysisFireTask(FireTaskBase):
                                 NEDOS   =   2000)       # how many points for DOS calculation
 
 
-
         self.coarse_relax_dict = dict(    LCHARG  =  True,      # Write charge densities?
                                           PREC    = 'MEDIUM',   # level of precision
                                           EDIFF   =   1E-4,     # criterion to stop SCF loop, in eV
