@@ -158,6 +158,20 @@ class MyVaspFireTask(FireTaskBase):
         else:
             self.nproc = 16
 
+        if 'maximum_relaxations' in d:
+            self.maximum_relaxations = int(d['maximum_relaxations'])
+        else:
+            self.maximum_relaxations = 9
+
+        if 'distress_number_relaxations' in d:
+            self.distress_number_relaxations = int(d['distress_number_relaxations'])
+        else:
+            self.distress_number_relaxations = 6
+
+
+
+
+
         if 'supplementary_incar_dict' in d:
             self.supplementary_incar_dict = d['supplementary_incar_dict']
         else:
@@ -399,7 +413,7 @@ class MyAnalysisFireTask(FireTaskBase):
         self.define_job_dictionaries()
 
         if self.job_type == 'relax': 
-            if max_force < 0.05 or self.version > 8: 
+            if max_force < 0.05 or self.version >= self.maximum_relaxations:
                 # relaxations are done, or it is hopless to reduce forces! Let's do a ground state!                    
                 fw_spec['job_type'] = 'ground_state'
                 fw_spec['name'] = formula+'_ground_state_V%i'%(self.version)  
@@ -423,7 +437,7 @@ class MyAnalysisFireTask(FireTaskBase):
                 fw_spec['name'] = formula+'_relax_V%i'%(self.version)  
                 fw_spec['_launch_dir'] = fw_spec['top_dir']+'/relax_V%i/'%(self.version)  
 
-                if self.version > 6:
+                if self.version > self.distress_number_relaxations:
                     # relaxation is in distress!
                     potim = 0.2
                 else:
