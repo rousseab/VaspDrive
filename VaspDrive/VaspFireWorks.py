@@ -409,6 +409,18 @@ class MyAnalysisFireTask(FireTaskBase):
         fw_spec['structure'] = structure 
         fw_spec['previous_launch_dir'] = fw_spec['_launch_dir']
 
+
+        if 'maximum_relaxations' in fw_spec:
+            self.maximum_relaxations = int(fw_spec['maximum_relaxations'])
+        else:
+            self.maximum_relaxations = 9
+
+        if 'distress_number_relaxations' in fw_spec:
+            self.distress_number_relaxations = int(fw_spec['distress_number_relaxations'])
+        else:
+            self.distress_number_relaxations = 6
+
+
         formula  = structure.formula.replace(' ','')
         self.define_job_dictionaries()
 
