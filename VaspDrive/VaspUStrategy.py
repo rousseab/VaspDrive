@@ -81,6 +81,56 @@ class U_Strategy(object):
         """ nothing to do!"""
         return
 
+class U_Strategy_RAMP(U_strategy):
+    """
+    Class to create LDAU strings for VASP input, beyond what the MaterialsProject already
+    provide.
+    """
+    
+    def __init__(self,new_U_dict):
+        """ 
+        Don't do anything; this object is meant to be passed to a driver, which 
+        will decide what to do.
+        """
+
+        self._LDAU_KEYS = ['LDAUTYPE', 'LDAUPRINT', 'MAGMOM', 'LDAUL', 'LDAUJ', 'LDAUU', 'LDAU'] 
+
+        self.structure_has_been_read = False
+
+        # dictionary which contains the U value to apply to various TM elements
+        self.new_U_dict = new_U_dict
+
+
+    def get_LDAU(self):
+        """ Produce LDAU related variables, to be passed to VASP as strings """
+
+        # let's simply use the Materials Project results as default.
+
+        self.check_structure_is_read()
+
+    
+        dummy_input_set = MPVaspInputSet()
+        dict = dummy_input_set.as_dict() 
+        # Spoof the input set to throw in the values of U we want!
+        for symbol, U_value in self.new_U_dict.iteritems():
+            dict['config_dict']['INCAR']['LDAUU']['O'][symbol] = U_value
+
+        input_set = pymatgen.io.vaspio_set.DictVaspInputSet.from_dict(dict)
+
+        incar  = input_set.get_incar(self.structure)
+
+        LDAU_dict = {}
+        
+        for key in self._LDAU_KEYS: 
+            if key in incar:
+                LDAU_dict[key] = incar[key]
+
+        # no need to hack  the poscar or potcar
+        poscar_need_hack = False
+        potcar_need_hack = False
+
+        return LDAU_dict, poscar_need_hack, potcar_need_hack  
+
 
 class U_Strategy_MaterialsProject(U_Strategy):
     """
@@ -196,8 +246,6 @@ class U_Strategy_MaterialsProject(U_Strategy):
 
 
         return LDAU_dict, poscar_need_hack, potcar_need_hack  
-
-
 
 class U_Strategy_MaterialsProject_V2(U_Strategy):
     """
@@ -447,7 +495,6 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
         self.structure_has_been_read = False
         self.structure_has_been_modified = False
 
-
     def check_structure_is_modified(self):
         """ I'm sure this can be done better with @property..."""
         if not self.structure_has_been_modified: 
@@ -687,7 +734,6 @@ class U_Strategy_HexaCyanoFerrate(U_Strategy):
                 sys.exit()
 
         return new_potcar_symbols
-
 
 class U_Strategy_HexaCyanoFerrate_U_is_5_7(U_Strategy_HexaCyanoFerrate):
     """

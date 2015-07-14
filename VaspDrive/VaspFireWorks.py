@@ -105,14 +105,23 @@ class MyVaspFireTask(FireTaskBase):
         self._load_params(fw_spec)
 
         if 'previous_launch_dir' in fw_spec:
-            src = fw_spec['previous_launch_dir']+'/CHGCAR'
-            dst = launch_dir+'/CHGCAR'
+            src_chg = fw_spec['previous_launch_dir']+'/CHGCAR'
+            dst_chg = launch_dir+'/CHGCAR'
 
-        if self.job_type == 'coarse_relax' or self.job_type == 'relax' or self.job_type == 'ground_state':
+            src_wvf = fw_spec['previous_launch_dir']+'/WAVECAR'
+            dst_wvf = launch_dir+'/WAVECAR'
+
+
+        if self.job_type == 'coarse_relax' or self.job_type == 'relax' or \
+                self.job_type == 'ground_state' or self.job_type == 'ramp':
             try:
-                shutil.move(src, dst)            
+                shutil.move(src_chg, dst_chg)
             except:
                 print('CHGCAR could not be moved to working directory')
+            try:
+                shutil.move(src_wvf, dst_wvf)
+            except:
+                print('WAVECAR could not be moved to working directory')
 
             check = self.generate_VASP_inputs(self.structure, self.name, self.nproc, 
                                 U_strategy_instance = self.U_strategy, 
@@ -137,7 +146,6 @@ class MyVaspFireTask(FireTaskBase):
         new_fw = Firework(MyAnalysisFireTask(), fw_spec)
 
         return FWAction(additions=new_fw)
-
 
     def _load_params(self, d):
         """
@@ -169,9 +177,6 @@ class MyVaspFireTask(FireTaskBase):
             self.distress_number_relaxations = 6
 
 
-
-
-
         if 'supplementary_incar_dict' in d:
             self.supplementary_incar_dict = d['supplementary_incar_dict']
         else:
@@ -180,8 +185,17 @@ class MyVaspFireTask(FireTaskBase):
         if 'strategy_type' in d:
             if  d['strategy_type'] == 'HexaCyanoFerrate':
                 self.U_strategy = U_Strategy_HexaCyanoFerrate()
+
+            elif  d['strategy_type'] == 'RAMP':
+                if 'current_U_Fe' not in d:
+                    print("==== ERROR: the variable 'current_U_Fe' must be defined for RAMPING!")
+                    sys.exit()
+                U_Fe = d['current_U_Fe']
+                self.U_strategy = U_Strategy_RAMP(new_U_dict={'Fe':U_Fe})
+
             elif  d['strategy_type'] == 'MaterialsProject':
                 self.U_strategy = U_Strategy_MaterialsProject(variable_magnetization_dict={'Fe':[5,4]})
+
             elif  d['strategy_type'] == 'MaterialsProject_V2':
                 if 'variable_magnetization_dict' not in d:
                     print("==== ERROR: the variable 'variable_magnetization_dict' must be defined!")
@@ -194,7 +208,6 @@ class MyVaspFireTask(FireTaskBase):
                 sys.exit()
         else:
             self.U_strategy = None
-        
 
     def generate_VASP_inputs(self, structure, name, nproc=16, U_strategy_instance = None, 
                                                             supplementary_incar_dict = None):
@@ -261,7 +274,6 @@ class MyVaspFireTask(FireTaskBase):
             f.write(clean_template)
 
         return 0
-
 
     def get_MaterialsProject_DOS_VASP_inputs(self, structure, previous_vasp_dir, 
                                     nproc=16, kpoints_density=1000, U_strategy_instance = None, 
@@ -345,7 +357,6 @@ class MyAnalysisFireTask(FireTaskBase):
 
         return firework_action 
 
-
     def define_job_dictionaries(self):
         """ Simple convenience to define job parameters for various situations """
 
@@ -402,7 +413,6 @@ class MyAnalysisFireTask(FireTaskBase):
                                           ISIF    =     3,        # Do relax cell shape 
                                           POTIM   =     0.5,      # controls step in relaxation algorithm
                                           NSW     =     30)       # max number of ionic steps: if it takes more, something is wrong.
-
 
     def update_spec_and_launch_fireworks(self,structure, max_force, fw_spec):
 
@@ -496,6 +506,22 @@ class MyAnalysisFireTask(FireTaskBase):
                 new_fw = Firework(MyVaspFireTask(), fw_spec)
                 return FWAction(additions=new_fw)
 
+        if self.job_type == 'ramp': 
+            # let's ramp up the U value!
+
+            U_Fe = fw_spec['current_U_Fe']
+
+            if U_Fe = 5.3:
+                # we are done!
+                return FWAction()
+
+            self.version += 1
+            fw_spec['job_type'] = 'ramp'
+            fw_spec['name'] = formula+'_ramp_V%i'%(self.version)  
+            fw_spec['_launch_dir'] = fw_spec['top_dir']+'/ramp_V%i/'%(self.version)  
+            fw_spec['current_U_Fe'] += 0.1
+            new_fw = Firework(MyVaspFireTask(), fw_spec)
+            return FWAction(additions=new_fw)
 
         if self.job_type == 'ground_state': 
             # let's do the DOS and BADER next!
@@ -526,7 +552,6 @@ class MyAnalysisFireTask(FireTaskBase):
         if self.job_type == 'DOS' or self.job_type == 'Bader': 
             # we are done!
             return FWAction()
-
 
     def extract_run_data_info(self):
         """ read the json file and extract the structure """
