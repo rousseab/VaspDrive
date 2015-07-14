@@ -202,7 +202,12 @@ class MyVaspFireTask(FireTaskBase):
                     sys.exit()
                 variable_magnetization_dict = d['variable_magnetization_dict']
                 self.U_strategy = U_Strategy_MaterialsProject_V2(variable_magnetization_dict)
-
+            elif  d['strategy_type'] == 'U_Strategy_Yamada_Nitrogen':
+                if 'variable_magnetization_dict' not in d:
+                    print("==== ERROR: the variable 'variable_magnetization_dict' must be defined!")
+                    sys.exit()
+                variable_magnetization_dict = d['variable_magnetization_dict']
+                self.U_strategy = U_Strategy_Yamada_Nitrogen(variable_magnetization_dict)
             else:
                 print("UNKNOWN STRATEGY! FAIL HARD")
                 sys.exit()
@@ -418,6 +423,18 @@ class MyAnalysisFireTask(FireTaskBase):
 
         fw_spec['structure'] = structure 
         fw_spec['previous_launch_dir'] = fw_spec['_launch_dir']
+
+
+        if 'maximum_relaxations' in fw_spec:
+            self.maximum_relaxations = int(fw_spec['maximum_relaxations'])
+        else:
+            self.maximum_relaxations = 9
+
+        if 'distress_number_relaxations' in fw_spec:
+            self.distress_number_relaxations = int(fw_spec['distress_number_relaxations'])
+        else:
+            self.distress_number_relaxations = 6
+
 
         formula  = structure.formula.replace(' ','')
         self.define_job_dictionaries()
