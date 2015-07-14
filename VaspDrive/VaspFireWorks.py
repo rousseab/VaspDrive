@@ -528,7 +528,7 @@ class MyAnalysisFireTask(FireTaskBase):
 
             U_Fe = fw_spec['current_U_Fe']
 
-            if U_Fe = 5.3:
+            if U_Fe == 5.3:
                 # we are done!
                 return FWAction()
 
