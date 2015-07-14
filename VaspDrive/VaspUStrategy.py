@@ -81,7 +81,7 @@ class U_Strategy(object):
         """ nothing to do!"""
         return
 
-class U_Strategy_RAMP(U_strategy):
+class U_Strategy_RAMP(U_Strategy):
     """
     Class to create LDAU strings for VASP input, beyond what the MaterialsProject already
     provide.
