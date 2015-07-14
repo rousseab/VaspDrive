@@ -10,6 +10,9 @@ from collections import OrderedDict, namedtuple
 from pymatgen.io.vaspio_set import MPVaspInputSet
 from pymatgen.io.vaspio.vasp_input import Poscar, Potcar
 import sys
+import itertools
+from pymatgen.analysis.energy_models import  EwaldElectrostaticModel
+
 
 
 import numpy as np
@@ -293,8 +296,6 @@ class U_Strategy_MaterialsProject_V2(U_Strategy):
 
         return MAGMOM 
 
-
-
     def get_LDAU(self):
         """ Produce LDAU related variables, to be passed to VASP as strings """
 
@@ -311,6 +312,125 @@ class U_Strategy_MaterialsProject_V2(U_Strategy):
 
         return LDAU_dict, poscar_need_hack, potcar_need_hack  
 
+class U_Strategy_Yamada_Nitrogen(U_Strategy):
+    """
+    Class to create LDAU strings for VASP input, starting from what the MaterialsProject already
+    provides, but with variable starting magnetization on the transition metal sites.
+
+    An algorithm specifically tailored to my Nitrogen substitutions in the Yamada structure is 
+    implemented. 
+    """
+    
+    def __init__(self,variable_magnetization_dict={'Fe':{'n_reduced':0,'m_reduced':3.79,'m_oxidized':4.36}}):
+        """ 
+
+        input:        
+            variable_magnetization_dict: 
+                    - key: elements which can have different oxidation states
+                    - value: dictionary containing number of reduced elements, and corresponding
+                             trial magnetization.
+
+        Which Elements to reduce or oxidize will be determined by minimizing electrostatic energy.
+        """
+
+        self.structure_has_been_read = False
+
+        self._LDAU_KEYS = ['LDAUTYPE', 'LDAUPRINT', 'MAGMOM', 'LDAUL', 'LDAUJ', 'LDAUU', 'LDAU'] 
+
+        self.variable_magnetization_dict = variable_magnetization_dict 
+
+    def Find_Lowest_Energy_Structure_Electrostatics(self):
+        """
+        Find oxidized/reduced combination with lowest electrostatic energy
+        """
+        n_Na = self.structure.composition['Na']
+        n_S = self.structure.composition['S']
+        n_O = self.structure.composition['O']
+        n_N = self.structure.composition['N']
+        n_Fe = self.structure.composition['Fe']
+
+        n_Fe_reduced = self.variable_magnetization_dict['Fe']['n_reduced']
+        n_Fe_oxidized = n_Fe-n_Fe_reduced 
+
+        N_charge = ( 2.*n_O-6.*n_S-n_Na-3.*n_Fe_oxidized-2.*n_Fe_reduced )/n_N
+
+        oxidation_states = {'Na':+1, 'Fe':+3, 'O':-2,'S':+6,'N':N_charge}
+        Fe_2plus = pymatgen.Specie('Fe',oxidation_state=+2)
+
+        structure_with_charges = self.structure.copy()
+        structure_with_charges.add_oxidation_state_by_element(oxidation_states)                                           
+
+        # identify  Fe sites
+        list_Fe_indices = []
+        for i,site in enumerate(structure_with_charges):
+            if site.specie.symbol == 'Fe':
+                list_Fe_indices.append(i)
+
+        # Generate all possible permutation  of sites and compute 
+        # Ewald energy
+        ewald_model = EwaldElectrostaticModel(acc_factor=6)
+        list_reduced_sets = []
+        list_ewald_energy = []
+        for reduced_set in itertools.combinations(list_Fe_indices,n_Fe_reduced):
+            list_reduced_sets.append(reduced_set) 
+
+            struct = structure_with_charges.copy()
+            for i in reduced_set:
+                struct.replace(i, Fe_2plus)
+
+            list_ewald_energy.append(ewald_model.get_energy(struct))
+
+        imin = np.argmin(list_ewald_energy)
+
+        list_reduced_site_indices = list_reduced_sets[imin] 
+        list_oxidized_site_indices = []
+        for i in list_Fe_indices:
+            if i not in list_reduced_site_indices: 
+                list_oxidized_site_indices.append(i) 
+
+        return list_reduced_site_indices, list_oxidized_site_indices 
+  
+    def build_magmom(self, list_oxidized_site_indices, list_reduced_site_indices):
+        """
+        Build MAGMOM, given that some sites must be reduced
+        """
+
+        MAGMOM = []
+        # tabulate how many sites must be reduced from every species in the variable_magnetization_dict.
+
+        for i_s, site in enumerate(self.structure):
+
+            random_addition = np.round( 0.02*np.random.random(1)[0]-0.01, 6)
+
+            if i_s in list_oxidized_site_indices:
+                m0 = self.variable_magnetization_dict['Fe']['m_reduced']
+            elif i_s in list_reduced_site_indices:
+                m0 = self.variable_magnetization_dict['Fe']['m_oxidized']
+            else:
+                m0 = 0.3
+                random_addition = 0.
+
+            MAGMOM.append(m0+random_addition)
+
+        return MAGMOM 
+
+    def get_LDAU(self):
+        """ Produce LDAU related variables, to be passed to VASP as strings """
+
+        # let's simply use the default as a first step
+        LDAU_dict, poscar_need_hack, potcar_need_hack = super(U_Strategy_Yamada_Nitrogen, self).get_LDAU()
+
+        Na_indices = self.structure.indices_from_symbol('Na')
+
+        #  hack MAGMOM
+        list_reduced_site_indices, list_oxidized_site_indices = \
+                            self.Find_Lowest_Energy_Structure_Electrostatics()
+
+        MAGMOM = self.build_magmom(list_oxidized_site_indices, list_reduced_site_indices)
+
+        LDAU_dict['MAGMOM'] = MAGMOM 
+
+        return LDAU_dict, poscar_need_hack, potcar_need_hack  
 
 class U_Strategy_HexaCyanoFerrate(U_Strategy):
     """
