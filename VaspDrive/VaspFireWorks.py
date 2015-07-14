@@ -223,7 +223,6 @@ class MyVaspFireTask(FireTaskBase):
 
         # let's start with MP
         input_set = MPVaspInputSet()
-       
         incar  = input_set.get_incar(structure)
 
         poscar_need_hack = False
@@ -536,6 +535,11 @@ class MyAnalysisFireTask(FireTaskBase):
             fw_spec['job_type'] = 'ramp'
             fw_spec['name'] = formula+'_ramp_V%i'%(self.version)  
             fw_spec['_launch_dir'] = fw_spec['top_dir']+'/ramp_V%i/'%(self.version)  
+
+            if fw_spec['current_U_Fe'] < 0.1:
+                #  go around the idiotic pymatgen behavior of reseting U = 5.3 if we set U = 0.
+                fw_spec['current_U_Fe'] = 0.
+
             fw_spec['current_U_Fe'] += 0.1
             new_fw = Firework(MyVaspFireTask(), fw_spec)
             return FWAction(additions=new_fw)
@@ -585,7 +589,6 @@ class MyAnalysisFireTask(FireTaskBase):
         max_force = np.sqrt(np.sum(np.array(last_step['forces'])**2,axis=1)).max() 
 
         return structure, max_force 
-
 
     def write_structure(self,structure):
 
