@@ -428,8 +428,7 @@ class MyAnalysisFireTask(FireTaskBase):
                                  LWAVE   =   True,       # write out the wavefunctions?
                                  NELM    =   150,        # maximum number of SCF cycles 
                                  ISTART  =   1,          # read in wavefunctions, if they are present
-                                 ALGO    =   'NORMAL',   # use block davidson, or else ZHEGV fails
-                                 LAECHG  =   True)       # Compute and write CORE electronic density, for BADER
+                                 ALGO    =   'NORMAL')   # use block davidson, or else ZHEGV fails
 
 
     def update_spec_and_launch_fireworks(self,structure, max_force, fw_spec):
