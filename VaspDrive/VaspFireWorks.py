@@ -418,6 +418,20 @@ class MyAnalysisFireTask(FireTaskBase):
                                           POTIM   =     0.5,      # controls step in relaxation algorithm
                                           NSW     =     30)       # max number of ionic steps: if it takes more, something is wrong.
 
+        self.RAMP_dict = dict(   EDIFF   =   1E-5,       # criterion to stop SCF loop, in eV
+                                 ENCUT   =   520,        # HIGH encut
+                                 PREC    =   'ACCURATE', # level of precision
+                                 NSW     =     0,        # no ionic steps: fixed ions
+                                 ICHARG  =     1,        # read in the CHGCAR file
+                                 LORBIT  =   11,         # 11 prints out the DOS
+                                 LCHARG  =   True,       # Write charge densities?
+                                 LWAVE   =   True,       # write out the wavefunctions?
+                                 NELM    =   150,        # maximum number of SCF cycles 
+                                 ISTART  =   1,          # read in wavefunctions, if they are present
+                                 ALGO    =   'NORMAL',   # use block davidson, or else ZHEGV fails
+                                 LAECHG  =   True)       # Compute and write CORE electronic density, for BADER
+
+
     def update_spec_and_launch_fireworks(self,structure, max_force, fw_spec):
 
         fw_spec['structure'] = structure 
@@ -532,6 +546,7 @@ class MyAnalysisFireTask(FireTaskBase):
                 return FWAction()
 
             self.version += 1
+            fw_spec['version'] = self.version
             fw_spec['job_type'] = 'ramp'
             fw_spec['name'] = formula+'_ramp_V%i'%(self.version)  
             fw_spec['_launch_dir'] = fw_spec['top_dir']+'/ramp_V%i/'%(self.version)  
@@ -541,6 +556,11 @@ class MyAnalysisFireTask(FireTaskBase):
                 fw_spec['current_U_Fe'] = 0.
 
             fw_spec['current_U_Fe'] += 0.1
+            if 'supplementary_incar_dict' in fw_spec:
+                fw_spec['supplementary_incar_dict'].update(self.RAMP_dict) 
+            else:
+                fw_spec['supplementary_incar_dict'] = self.RAMP_dict 
+
             new_fw = Firework(MyVaspFireTask(), fw_spec)
             return FWAction(additions=new_fw)
 
