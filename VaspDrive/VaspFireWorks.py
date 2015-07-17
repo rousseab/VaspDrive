@@ -129,7 +129,7 @@ class MyVaspFireTask(FireTaskBase):
 
         elif self.job_type == 'DOS':
             try:
-                shutil.copy(src, dst)            
+                shutil.copy(src_chg, dst_chg)            
             except:
                 print('CHGCAR could not be COPIED to working directory')
 
@@ -423,6 +423,7 @@ class MyAnalysisFireTask(FireTaskBase):
                                  PREC    =   'ACCURATE', # level of precision
                                  NSW     =     0,        # no ionic steps: fixed ions
                                  ICHARG  =     1,        # read in the CHGCAR file
+                                 LAECHG  =   False,      # DO NOT compute and write CORE electronic density
                                  LORBIT  =   11,         # 11 prints out the DOS
                                  LCHARG  =   True,       # Write charge densities?
                                  LWAVE   =   True,       # write out the wavefunctions?
