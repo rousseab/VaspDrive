@@ -410,6 +410,31 @@ class AnalyseJsonData():
 
         return MAG
 
+    def extract_projected_charges(self,Element=None):
+        
+        S_charge = []
+        P_charge = []
+        D_charge = []
+
+        for data_dictionary, structure in zip(self.list_data_dictionaries,self.list_structures):
+            list_dict = data_dictionary['OUTCAR']['charge']                                                              
+            list_s = []
+            list_p = []
+            list_d = []
+
+            for site, dict in zip(structure,list_dict):
+
+                if Element == None or  site.specie == Element:
+                    list_s.append(dict['s'])
+                    list_p.append(dict['p'])
+                    list_d.append(dict['d'])
+
+            S_charge.append(list_s)
+            P_charge.append(list_p)
+            D_charge.append(list_d)
+
+        return S_charge, P_charge, D_charge
+
 class AnalyseMaterialsProjectJsonData():
     """
     Class which will wrap around boilerplate analysis of MaterialsProject-like
