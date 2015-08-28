@@ -286,8 +286,6 @@ class projected_DOS_reader(object):
                            '%s_s_dn','%s_p_dn','%s_d_dn']
 
 
-
-
         self.pdos_dict = {}
     
         for specie in self.structure.types_of_specie:
@@ -302,7 +300,11 @@ class projected_DOS_reader(object):
                         pdos = np.zeros_like(self.DOS_up)
                         for ii in indices:
                             pdos += doscar.site_dos(i,ii)
-                        self.pdos_dict[pdict_key%el] = pdos
+
+                        if self.pdos_dict.has_key(pdict_key%el):
+                            self.pdos_dict[pdict_key%el] += pdos
+                        else:
+                            self.pdos_dict[pdict_key%el] = pdos
 
 
     def compute_EF(self):
