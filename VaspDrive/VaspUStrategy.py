@@ -123,7 +123,15 @@ class U_Strategy_RAMP(U_Strategy):
         
         for key in self._LDAU_KEYS: 
             if key in incar:
-                LDAU_dict[key] = incar[key]
+                if key == 'MAGMOM':
+
+                    magn_array = np.array(incar[key])
+                    # add randomness to large values, corresponding to TM
+                    new_magn_array = np.where(magn_array > 1, magn_array+0.01*np.random.random(len(magn_array)), magn_array)
+    
+                    LDAU_dict[key] = list(new_magn_array)
+                else:
+                    LDAU_dict[key] = incar[key]
 
         # no need to hack  the poscar or potcar
         poscar_need_hack = False
@@ -428,13 +436,21 @@ class U_Strategy_Yamada_Nitrogen(U_Strategy):
 
             list_ewald_energy.append(ewald_model.get_energy(struct))
 
-        imin = np.argmin(list_ewald_energy)
+        if len(list_ewald_energy) == 0:
+            # all sites are oxidized. No sorting involved                
+            list_reduced_site_indices = []
+            list_oxidized_site_indices = list_Fe_indices
+        else:
+            # some reduction takes place. Identify best electrostatic choice
 
-        list_reduced_site_indices = list_reduced_sets[imin] 
-        list_oxidized_site_indices = []
-        for i in list_Fe_indices:
-            if i not in list_reduced_site_indices: 
-                list_oxidized_site_indices.append(i) 
+            imin = np.argmin(list_ewald_energy)
+
+            list_reduced_site_indices = list_reduced_sets[imin] 
+            list_oxidized_site_indices = []
+            for i in list_Fe_indices:
+                if i not in list_reduced_site_indices: 
+                    list_oxidized_site_indices.append(i) 
+
 
         return list_reduced_site_indices, list_oxidized_site_indices 
   

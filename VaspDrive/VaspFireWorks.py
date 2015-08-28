@@ -129,7 +129,7 @@ class MyVaspFireTask(FireTaskBase):
 
         elif self.job_type == 'DOS':
             try:
-                shutil.copy(src, dst)            
+                shutil.copy(src_chg, dst_chg)            
             except:
                 print('CHGCAR could not be COPIED to working directory')
 
@@ -145,7 +145,23 @@ class MyVaspFireTask(FireTaskBase):
         # push an analysis job in the launchpad!
         new_fw = Firework(MyAnalysisFireTask(), fw_spec)
 
+        # CASIR workaround
+        self.change_gid()
+
         return FWAction(additions=new_fw)
+
+
+    def change_gid(self):
+        """ Casir is set up such that computation data should belong to group gc029, not to my user's group!
+            This regularly crashes my jobs; here I will change ids every time an analysis takes place """
+
+        uid_xw2738 = 1090
+        gid_gc029 = 2005
+
+        for dirpath, dirnames, filenames in os.walk('./'):
+            for filename in filenames:
+                path = os.path.join(dirpath,filename)
+                os.chown(path,uid_xw2738,gid_gc029)
 
     def _load_params(self, d):
         """
@@ -359,7 +375,24 @@ class MyAnalysisFireTask(FireTaskBase):
         # Decide what to do next!
         firework_action = self.update_spec_and_launch_fireworks(structure, max_force, fw_spec)
 
+        # change files' group id, to avoid CASIR idiosyncratic behavior.
+        self.change_gid()
+
         return firework_action 
+
+    def change_gid(self):
+        """ Casir is set up such that computation data should belong to group gc029, not to my user's group!
+            This regularly crashes my jobs; here I will change ids every time an analysis takes place """
+
+        uid_xw2738 = 1090
+        gid_gc029 = 2005
+
+        for dirpath, dirnames, filenames in os.walk('./'):
+            for filename in filenames:
+                path = os.path.join(dirpath,filename)
+                os.chown(path,uid_xw2738,gid_gc029)
+
+            
 
     def define_job_dictionaries(self):
         """ Simple convenience to define job parameters for various situations """
@@ -423,6 +456,7 @@ class MyAnalysisFireTask(FireTaskBase):
                                  PREC    =   'ACCURATE', # level of precision
                                  NSW     =     0,        # no ionic steps: fixed ions
                                  ICHARG  =     1,        # read in the CHGCAR file
+                                 LAECHG  =   False,      # DO NOT compute and write CORE electronic density
                                  LORBIT  =   11,         # 11 prints out the DOS
                                  LCHARG  =   True,       # Write charge densities?
                                  LWAVE   =   True,       # write out the wavefunctions?
@@ -644,5 +678,21 @@ class MyBaderFireTask(FireTaskBase):
 
         os.system('bash bader_job.sh')           
 
+        # CASIR workaround
+        self.change_gid()
+
         # end of the line
         return FWAction()
+
+
+    def change_gid(self):
+        """ Casir is set up such that computation data should belong to group gc029, not to my user's group!
+            This regularly crashes my jobs; here I will change ids every time an analysis takes place """
+
+        uid_xw2738 = 1090
+        gid_gc029 = 2005
+
+        for dirpath, dirnames, filenames in os.walk('./'):
+            for filename in filenames:
+                path = os.path.join(dirpath,filename)
+                os.chown(path,uid_xw2738,gid_gc029)
