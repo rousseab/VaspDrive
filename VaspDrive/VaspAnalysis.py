@@ -87,7 +87,6 @@ def compute_voltage(list_x_alkali,list_energies_per_unit,E_alkali):
 
     return np.array(list_x_plateau), np.array(list_V_plateau)
 
-
 class VaspDos(object):
     """Class for representing density-of-states produced by VASP
 
@@ -220,7 +219,6 @@ class VaspDos(object):
             dos.append(cdos.T)
         self._site_dos = np.array(dos)
 
-
 class projected_DOS_reader(object):
     """
     This function wraps around the code I wrote to extract meaningful
@@ -271,24 +269,39 @@ class projected_DOS_reader(object):
         indices_up = np.arange(0,18,2)
         indices_dn = np.arange(1,19,2)
 
+        indices_s_up = indices_up[0] 
+        indices_p_up = indices_up[1:4] 
+        indices_d_up = indices_up[4:] 
+
+        indices_s_dn = indices_dn[0] 
+        indices_p_dn = indices_dn[1:4] 
+        indices_d_dn = indices_dn[4:] 
+
+        list_indices = [indices_up, indices_dn, 
+                        indices_s_up, indices_p_up, indices_d_up, 
+                        indices_s_dn, indices_p_dn, indices_d_dn]
+
+        el = specie.symbol
+        list_pdict_keys = [el+'_up',el+'_dn',
+                           el+'_s_up',el+'_p_up',el+'_d_up',
+                           el+'_s_dn',el+'_p_dn',el+'_d_dn']
+
+
+
+
         self.pdos_dict = {}
     
         for specie in self.structure.types_of_specie:
 
-            pdos_up = np.zeros_like(self.DOS_up)
-            pdos_dn = np.zeros_like(self.DOS_dn)
 
             for i,site in enumerate(self.structure):
                 if site.specie == specie:
 
-                    for iu in indices_up:
-                        pdos_up += doscar.site_dos(i,iu)
-                    for id in indices_dn: 
-                        pdos_dn += doscar.site_dos(i,id)
-
-            self.pdos_dict['%s_up'%specie.symbol] = pdos_up 
-            self.pdos_dict['%s_dn'%specie.symbol] = pdos_dn
-
+                    for indices, pdict_key in zip(list_indices, list_pdict_keys):
+                        pdos = np.zeros_like(self.DOS_up)
+                        for ii in indices:
+                            pdos += doscar.site_dos(i,ii)
+                        self.pdos_dict[pdict_key] = pdos
 
 
     def compute_EF(self):
