@@ -269,11 +269,11 @@ class projected_DOS_reader(object):
         indices_up = np.arange(0,18,2)
         indices_dn = np.arange(1,19,2)
 
-        indices_s_up = indices_up[0] 
+        indices_s_up = indices_up[0:1]  # insures we have an array, not an int!
         indices_p_up = indices_up[1:4] 
         indices_d_up = indices_up[4:] 
 
-        indices_s_dn = indices_dn[0] 
+        indices_s_dn = indices_dn[0:1] 
         indices_p_dn = indices_dn[1:4] 
         indices_d_dn = indices_dn[4:] 
 
