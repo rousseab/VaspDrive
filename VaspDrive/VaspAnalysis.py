@@ -281,10 +281,9 @@ class projected_DOS_reader(object):
                         indices_s_up, indices_p_up, indices_d_up, 
                         indices_s_dn, indices_p_dn, indices_d_dn]
 
-        el = specie.symbol
-        list_pdict_keys = [el+'_up',el+'_dn',
-                           el+'_s_up',el+'_p_up',el+'_d_up',
-                           el+'_s_dn',el+'_p_dn',el+'_d_dn']
+        list_pdict_keys = ['%s_up','%s_dn',
+                           '%s_s_up','%s_p_up','%s_d_up',
+                           '%s_s_dn','%s_p_dn','%s_d_dn']
 
 
 
@@ -293,15 +292,17 @@ class projected_DOS_reader(object):
     
         for specie in self.structure.types_of_specie:
 
-
             for i,site in enumerate(self.structure):
                 if site.specie == specie:
 
+                    el = specie.symbol
+
                     for indices, pdict_key in zip(list_indices, list_pdict_keys):
+
                         pdos = np.zeros_like(self.DOS_up)
                         for ii in indices:
                             pdos += doscar.site_dos(i,ii)
-                        self.pdos_dict[pdict_key] = pdos
+                        self.pdos_dict[pdict_key%el] = pdos
 
 
     def compute_EF(self):
